@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>智慧GPS公車報站系統</title>
+    <title>智慧 GPS 四語公車報站系統 (橫向/平板優化版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
@@ -12,7 +12,10 @@
 
         let firebaseConfig = {};
         try {
-            firebaseConfig = JSON.parse(__firebase_config);
+            // 檢查是否在具有 __firebase_config 的環境中
+            if (typeof __firebase_config !== 'undefined') {
+                firebaseConfig = JSON.parse(__firebase_config);
+            }
         } catch (e) {
             console.error("Firebase config error", e);
         }
@@ -41,11 +44,18 @@
             .scrollable-list { height: calc(100vh - 180px); overflow-y: auto; padding-right: 10px; }
         }
 
-        /* 確保底部導覽永遠在最上層 */
-        #bottom-nav { z-index: 9999; }
+        /* 加強底部導覽點擊 */
+        #bottom-nav { 
+            z-index: 10000 !important; 
+            pointer-events: auto !important;
+            touch-action: manipulation;
+        }
+        
+        /* 防止內容被導覽列擋住 */
+        .content-safe-area { padding-bottom: 100px; }
     </style>
 </head>
-<body class="pb-24">
+<body class="content-safe-area">
     <!-- 頂部導航欄 -->
     <nav class="bg-slate-900 text-white p-4 sticky top-0 z-50 shadow-lg">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
@@ -74,7 +84,6 @@
             
             <!-- 左側/上方：報站控制區 -->
             <div class="sticky-panel space-y-6">
-                <!-- 路線名稱與進度 -->
                 <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 relative overflow-hidden">
                     <div class="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
                     
@@ -118,7 +127,6 @@
             <!-- 右側/下方：內容切換區 -->
             <div class="content-panel">
                 <div id="tab-stations" class="scrollable-list space-y-3">
-                    <!-- 站點列表由 JS 渲染 -->
                     <div class="text-center py-20 text-gray-400 font-bold">
                         <p class="text-4xl mb-4">📍</p>
                         <p>請先到「切換路線」分頁載入資料</p>
@@ -161,16 +169,16 @@
         </div>
     </main>
 
-    <!-- 底部導覽 (經典固定底部) -->
-    <div id="bottom-nav" class="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-100 px-6 py-4 flex justify-around items-center">
-        <button onclick="switchTab('stations')" id="nav-stations" class="flex flex-col items-center gap-1 text-blue-600 flex-1">
-            <span class="text-2xl">📍</span><span class="text-[10px] font-black uppercase">站點列表</span>
+    <!-- 底部導覽 -->
+    <div id="bottom-nav" class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-200 px-6 py-4 flex justify-around items-center">
+        <button onclick="switchTab('stations')" id="nav-stations" class="flex flex-col items-center gap-1 text-blue-600 flex-1 cursor-pointer">
+            <span class="text-2xl pointer-events-none">📍</span><span class="text-[10px] font-black uppercase pointer-events-none">站點列表</span>
         </button>
-        <button onclick="switchTab('routes')" id="nav-routes" class="flex flex-col items-center gap-1 text-gray-400 flex-1">
-            <span class="text-2xl">🚌</span><span class="text-[10px] font-black uppercase">切換路線</span>
+        <button onclick="switchTab('routes')" id="nav-routes" class="flex flex-col items-center gap-1 text-gray-400 flex-1 cursor-pointer">
+            <span class="text-2xl pointer-events-none">🚌</span><span class="text-[10px] font-black uppercase pointer-events-none">切換路線</span>
         </button>
-        <button onclick="switchTab('settings')" id="nav-settings" class="flex flex-col items-center gap-1 text-gray-400 flex-1">
-            <span class="text-2xl">⚙️</span><span class="text-[10px] font-black uppercase">偏好設定</span>
+        <button onclick="switchTab('settings')" id="nav-settings" class="flex flex-col items-center gap-1 text-gray-400 flex-1 cursor-pointer">
+            <span class="text-2xl pointer-events-none">⚙️</span><span class="text-[10px] font-black uppercase pointer-events-none">偏好設定</span>
         </button>
     </div>
 
@@ -186,13 +194,14 @@
         let speechSettings = JSON.parse(localStorage.getItem('bus_speech_settings')) || { volume: 1.0, rate: 1.0 };
         const apiKey = ""; 
 
-        // 離線預估：平均時速 30km/h = 約 8.33 m/s
         const AVG_SPEED = 8.33;
 
         window.onload = () => {
             renderRoutes();
             updateUI();
             initAuth();
+            
+            // 預設頁面切換
             if (currentRouteIndex !== -1) {
                 switchTab('stations');
             } else {
@@ -364,11 +373,11 @@
 
                     return `
                     <div onclick="jumpTo(${i})" class="station-card bg-white p-5 rounded-2xl border border-gray-100 flex justify-between items-center ${i === currentIndex ? 'station-active shadow-lg' : 'opacity-60'}">
-                        <div class="flex-1 truncate pr-4">
+                        <div class="flex-1 truncate pr-4 pointer-events-none">
                             <p class="font-black text-gray-800 text-xl truncate">${st.name}</p>
                             <p class="text-[10px] text-gray-400 font-bold uppercase truncate tracking-widest">${st.enName || '-'}</p>
                         </div>
-                        ${etaContent}
+                        <div class="pointer-events-none">${etaContent}</div>
                     </div>`;
                 }).join('');
             }
@@ -400,18 +409,38 @@
             updateUI();
         };
 
+        // 重要：全域切換 Tab 函數
         window.switchTab = (t) => {
-            console.log("Switching to tab:", t);
+            console.log("切換至分頁:", t);
             const tabs = ['stations', 'routes', 'settings'];
+            
+            // 處理內容顯示
             tabs.forEach(k => {
-                const content = document.getElementById(`tab-${k}`);
+                const el = document.getElementById(`tab-${k}`);
                 const nav = document.getElementById(`nav-${k}`);
-                if (content) content.classList.toggle('hidden', k !== t);
+                
+                if (el) {
+                    if (k === t) {
+                        el.classList.remove('hidden');
+                    } else {
+                        el.classList.add('hidden');
+                    }
+                }
+                
                 if (nav) {
-                    nav.classList.toggle('text-blue-600', k === t);
-                    nav.classList.toggle('text-gray-400', k !== t);
+                    if (k === t) {
+                        nav.classList.replace('text-gray-400', 'text-blue-600');
+                    } else {
+                        nav.classList.replace('text-blue-600', 'text-gray-400');
+                    }
                 }
             });
+
+            // 如果是回到站點列表，滾動到最上方
+            if (t === 'stations') {
+                const list = document.querySelector('.scrollable-list');
+                if (list) list.scrollTop = 0;
+            }
         };
 
         window.jumpTo = (i) => { currentIndex = i; updateUI(); };
