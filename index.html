@@ -125,23 +125,37 @@
             const s = allRoutes[currentRouteIdx].stations[activeIdx];
             window.speechSynthesis.cancel();
             
-            // 先響提示音
+            // 1. 到站播報提示音
             playDing();
             
             setTimeout(() => {
-                const uZh = new SpeechSynthesisUtterance(`${s.name}，到了。`);
-                uZh.lang = 'zh-TW';
-                uZh.rate = speechSettings.rate;
-                uZh.volume = speechSettings.volume;
-                
-                const uEn = new SpeechSynthesisUtterance(`Arrived at, ${s.enName || 'this station'}`);
-                uEn.lang = 'en-US';
-                uEn.rate = speechSettings.rate;
-                uEn.volume = speechSettings.volume;
+                // 2. 中文播報 2 次
+                const uZh1 = new SpeechSynthesisUtterance(`${s.name}，到了。`);
+                uZh1.lang = 'zh-TW';
+                uZh1.rate = speechSettings.rate;
+                uZh1.volume = speechSettings.volume;
 
-                window.speechSynthesis.speak(uZh);
-                window.speechSynthesis.speak(uEn);
-            }, 300); // 延遲讓提示音播完
+                const uZh2 = new SpeechSynthesisUtterance(`${s.name}，到了。`);
+                uZh2.lang = 'zh-TW';
+                uZh2.rate = speechSettings.rate;
+                uZh2.volume = speechSettings.volume;
+                
+                // 3. 英文播報 2 次
+                const uEn1 = new SpeechSynthesisUtterance(`Arrived at, ${s.enName || 'this station'}`);
+                uEn1.lang = 'en-US';
+                uEn1.rate = speechSettings.rate;
+                uEn1.volume = speechSettings.volume;
+
+                const uEn2 = new SpeechSynthesisUtterance(`Arrived at, ${s.enName || 'this station'}`);
+                uEn2.lang = 'en-US';
+                uEn2.rate = speechSettings.rate;
+                uEn2.volume = speechSettings.volume;
+
+                window.speechSynthesis.speak(uZh1);
+                window.speechSynthesis.speak(uZh2);
+                window.speechSynthesis.speak(uEn1);
+                window.speechSynthesis.speak(uEn2);
+            }, 300); 
         };
 
         // ==========================================
@@ -208,10 +222,11 @@
             activeIdx = 0;
             const r = allRoutes[i];
             
-            // 播放提示音與路線提示語
+            // 載入路線成功播放提示音
             playDing();
             setTimeout(() => {
-                const u = new SpeechSynthesisUtterance(`已載入路線：${r.name}`);
+                // 僅播報路線名稱
+                const u = new SpeechSynthesisUtterance(r.name);
                 u.lang = 'zh-TW';
                 u.rate = speechSettings.rate;
                 window.speechSynthesis.speak(u);
@@ -261,7 +276,7 @@
                         const d = getDistance(lat, lng, r.stations[activeIdx].lat, r.stations[activeIdx].lng);
                         updateUI(d);
                         // 到站自動播報邏輯 (50公尺內且非同一站)
-                        if(d < 50 && !window.lastAnnouncedIdx !== activeIdx) {
+                        if(d < 50 && window.lastAnnouncedIdx !== activeIdx) {
                              window.manualAnnounce();
                              window.lastAnnouncedIdx = activeIdx;
                         }
