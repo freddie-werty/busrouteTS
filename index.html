@@ -3,12 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>智慧 GPS 四語公車報站系統</title>
-    <!-- PWA 支持 -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3448/3448339.png">
-    
+    <title>智慧GPS公車報站系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
@@ -19,227 +14,192 @@
         try {
             firebaseConfig = JSON.parse(__firebase_config);
         } catch (e) {
-            console.error("Firebase 設定解析錯誤", e);
+            console.error("Firebase config error", e);
         }
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'bus-announcer-v8';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'bus-announcer-v8-classic';
 
         window.db = db;
         window.auth = auth;
         window.appId = appId;
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f0f2f5; overflow-x: hidden; }
+        .station-card { transition: all 0.2s ease; cursor: pointer; }
+        .station-active { border-left: 8px solid #2563eb; background-color: #eff6ff; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         
-        body { 
-            font-family: 'Noto Sans TC', sans-serif; 
-            background-color: #f3f4f6; 
-            -webkit-tap-highlight-color: transparent;
-            overscroll-behavior-y: contain;
+        /* 橫向模式佈局優化 */
+        @media (min-width: 1024px) {
+            .app-container { display: grid; grid-template-columns: 1fr 1.2fr; gap: 2rem; align-items: start; }
+            .sticky-panel { position: sticky; top: 100px; }
+            .scrollable-list { height: calc(100vh - 180px); overflow-y: auto; padding-right: 10px; }
         }
 
-        .glass {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-        }
-
-        .main-card {
-            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-            box-shadow: 0 20px 40px -15px rgba(59, 130, 246, 0.4);
-        }
-
-        .station-item {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .active-ring {
-            position: relative;
-        }
-        .active-ring::before {
-            content: '';
-            position: absolute;
-            left: -12px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 4px;
-            height: 60%;
-            background: #3b82f6;
-            border-radius: 2px;
-        }
-
-        @keyframes pulse-emerald {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-        }
-        .gps-dot { animation: pulse-emerald 2s infinite; }
-
-        .progress-bar-fill {
-            transition: width 0.5s ease-out;
-        }
+        /* 確保底部導覽永遠在最上層 */
+        #bottom-nav { z-index: 9999; }
     </style>
 </head>
-<body class="pb-32">
-    <div id="app" class="max-w-md mx-auto min-h-screen relative">
-        
-        <!-- 狀態資訊列 -->
-        <div class="px-6 pt-5 pb-2 flex justify-between items-center">
-            <div id="sync-status" class="flex items-center gap-2 bg-white/60 px-3 py-1.5 rounded-full border border-white glass shadow-sm">
-                <div id="sync-dot" class="w-2 h-2 rounded-full bg-gray-400"></div>
-                <span id="sync-text" class="text-[11px] font-bold text-gray-500">未連線</span>
+<body class="pb-24">
+    <!-- 頂部導航欄 -->
+    <nav class="bg-slate-900 text-white p-4 sticky top-0 z-50 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div class="bg-blue-600 p-2 rounded-lg">🚌</div>
+                <div>
+                    <h1 class="font-black text-xl tracking-tight leading-none">智慧報站系統</h1>
+                    <p id="sync-status" class="text-[10px] text-slate-400 font-bold uppercase mt-1">載入中...</p>
+                </div>
             </div>
-            <div class="flex items-center gap-2 bg-white/60 px-3 py-1.5 rounded-full border border-white glass shadow-sm">
-                <span class="text-[10px] font-bold text-gray-400">時速</span>
-                <span id="gps-speed" class="text-sm font-black text-blue-600">0</span>
-                <span class="text-[9px] font-bold text-gray-400">km/h</span>
+            <div class="flex items-center gap-6">
+                <div class="text-right">
+                    <div id="gps-speed" class="text-3xl font-black text-emerald-400">0</div>
+                    <div class="text-[9px] font-bold text-slate-400 uppercase">km/h</div>
+                </div>
+                <button onclick="toggleGPSTracking()" id="gps-toggle-btn-top" class="bg-slate-800 px-4 py-2 rounded-full border border-slate-700 text-xs font-black flex items-center gap-2 active:scale-95 transition-all">
+                    <span id="gps-dot-top" class="w-2 h-2 rounded-full bg-gray-500"></span>
+                    <span id="gps-text-top">啟動 GPS</span>
+                </button>
             </div>
         </div>
+    </nav>
 
-        <!-- 主顯示面板 -->
-        <div class="px-4 py-4">
-            <div class="main-card rounded-[2.5rem] p-7 text-white relative overflow-hidden">
-                <!-- 裝飾元素 -->
-                <div class="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-                
-                <div class="relative z-10">
-                    <div class="flex justify-between items-center mb-6">
-                        <div class="flex flex-col gap-1">
-                            <span id="status-label" class="bg-white/20 w-max text-[11px] px-3 py-1 rounded-full font-bold tracking-widest backdrop-blur-md">下一站 NEXT</span>
-                            <div id="tracking-indicator" class="hidden flex items-center gap-2 mt-2">
-                                <span class="w-2 h-2 bg-emerald-400 rounded-full gps-dot"></span>
-                                <span class="text-[10px] font-bold text-emerald-100 uppercase">GPS 追蹤中</span>
+    <main class="max-w-7xl mx-auto p-4 lg:p-8">
+        <div class="app-container">
+            
+            <!-- 左側/上方：報站控制區 -->
+            <div class="sticky-panel space-y-6">
+                <!-- 路線名稱與進度 -->
+                <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
+                    
+                    <div class="flex justify-between items-center mb-2">
+                        <span id="current-route-display" class="bg-slate-100 text-slate-600 px-3 py-1 rounded text-xs font-black">尚未載入路線</span>
+                        <div class="text-xs font-black text-blue-600"><span id="progress-text">0</span>% 完成</div>
+                    </div>
+
+                    <h2 id="current-station-name" class="text-5xl lg:text-6xl font-black text-gray-800 mb-2 truncate">請選擇路線</h2>
+                    <p id="current-station-en" class="text-gray-400 font-bold text-lg mb-8 truncate uppercase tracking-wide">Waiting for Selection</p>
+
+                    <div class="w-full bg-gray-100 h-3 rounded-full overflow-hidden mb-8">
+                        <div id="progress-bar" class="bg-blue-600 h-full transition-all duration-700 ease-out" style="width: 0%"></div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="prevStation()" class="bg-gray-50 border border-gray-200 py-4 rounded-2xl font-black text-gray-600 hover:bg-gray-100 active:scale-95 transition-all">上一站</button>
+                        <button onclick="nextStation()" class="bg-gray-50 border border-gray-200 py-4 rounded-2xl font-black text-gray-600 hover:bg-gray-100 active:scale-95 transition-all">下一站</button>
+                        <button onclick="manualAnnounce()" class="col-span-2 bg-slate-900 text-white py-6 rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3">
+                            <span class="text-2xl">📢</span> 立即報站 (目前站)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 設定區 (在大螢幕時顯示於左側下方) -->
+                <div id="quick-settings" class="hidden lg:block bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                    <h3 class="font-black text-gray-400 text-[10px] uppercase mb-4 tracking-widest">語音播報設定</h3>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-2">音量 (<span id="vol-val-lg">1.0</span>)</label>
+                            <input type="range" min="0" max="1" step="0.1" value="1" oninput="updateSpeechSetting('volume', this.value)" class="w-full accent-blue-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 mb-2">語速 (<span id="rate-val-lg">1.0</span>)</label>
+                            <input type="range" min="0.5" max="2" step="0.1" value="1" oninput="updateSpeechSetting('rate', this.value)" class="w-full accent-blue-600">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側/下方：內容切換區 -->
+            <div class="content-panel">
+                <div id="tab-stations" class="scrollable-list space-y-3">
+                    <!-- 站點列表由 JS 渲染 -->
+                    <div class="text-center py-20 text-gray-400 font-bold">
+                        <p class="text-4xl mb-4">📍</p>
+                        <p>請先到「切換路線」分頁載入資料</p>
+                    </div>
+                </div>
+
+                <div id="tab-routes" class="hidden space-y-6">
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                        <h3 class="font-black text-gray-800 mb-4 flex items-center gap-2">📥 <span>建立/匯入路線</span></h3>
+                        <input id="new-route-name" type="text" placeholder="路線名稱 (如: 299 往台北車站)" class="w-full p-4 bg-gray-50 rounded-xl mb-3 text-sm outline-none border-2 border-transparent focus:border-blue-500 transition-all font-bold">
+                        <textarea id="import-input" rows="4" class="w-full p-4 bg-gray-50 rounded-xl mb-4 text-[11px] font-mono outline-none border-2 border-transparent focus:border-blue-500 transition-all" placeholder="站名 緯度 經度 (每行一個站點)"></textarea>
+                        <div class="flex gap-3">
+                            <button id="translate-btn" onclick="translateCurrentInput()" class="flex-1 bg-blue-50 text-blue-600 py-3 rounded-xl font-black text-sm hover:bg-blue-100">AI 翻譯站名</button>
+                            <button onclick="saveNewRoute()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-black text-sm shadow-lg hover:bg-blue-700">儲存路線</button>
+                        </div>
+                    </div>
+                    <div id="saved-routes-list" class="space-y-3"></div>
+                </div>
+
+                <div id="tab-settings" class="hidden space-y-6">
+                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 space-y-6">
+                        <h3 class="font-black text-gray-800 text-lg">系統管理</h3>
+                        <div class="lg:hidden space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-600 mb-2">語音音量</label>
+                                <input type="range" min="0" max="1" step="0.1" value="1" oninput="updateSpeechSetting('volume', this.value)" class="w-full accent-blue-600">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-600 mb-2">語音語速</label>
+                                <input type="range" min="0.5" max="2" step="0.1" value="1" oninput="updateSpeechSetting('rate', this.value)" class="w-full accent-blue-600">
                             </div>
                         </div>
-                        <div class="text-right">
-                            <div id="route-progress" class="text-3xl font-black">0%</div>
-                            <div class="text-[9px] font-bold opacity-60 uppercase tracking-widest">行程進度</div>
+                        <div class="p-4 bg-amber-50 rounded-2xl border border-amber-100 text-amber-800 text-sm font-bold">
+                            ⚠️ 注意：本系統具備離線報站功能。首次載入路線後，建議在有網路時使用 AI 翻譯完成英文站名，之後即可完全斷網操作。
                         </div>
-                    </div>
-
-                    <h2 id="current-station-name" class="text-4xl font-black mb-1 truncate drop-shadow-md">請載入路線</h2>
-                    <p id="current-station-en" class="text-sm font-medium opacity-70 italic mb-8 truncate">Waiting for route selection...</p>
-
-                    <!-- 下一站資訊卡片 -->
-                    <div class="bg-black/20 rounded-2xl p-4 flex justify-between items-center backdrop-blur-sm border border-white/10">
-                        <div>
-                            <div id="dist-to-next" class="text-2xl font-black">--</div>
-                            <div class="text-[10px] opacity-60 font-bold uppercase tracking-widest">剩餘距離 (公尺)</div>
-                        </div>
-                        <div class="h-8 w-px bg-white/10"></div>
-                        <div class="text-right">
-                            <div id="eta-to-next" class="text-2xl font-black text-emerald-300">--</div>
-                            <div class="text-[10px] opacity-60 font-bold uppercase tracking-widest">預估時間 (離線)</div>
-                        </div>
+                        <button onclick="clearAllData()" class="w-full text-red-500 text-sm font-black py-4 border-2 border-red-500 rounded-2xl hover:bg-red-50 transition-colors uppercase tracking-widest">移除所有本機資料</button>
                     </div>
                 </div>
             </div>
         </div>
+    </main>
 
-        <!-- 進度條條 -->
-        <div class="px-8 -mt-2 mb-6">
-            <div class="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div id="progress-bar-fill" class="progress-bar-fill h-full bg-blue-500 w-0"></div>
-            </div>
-        </div>
-
-        <!-- 快速手動控制 -->
-        <div class="px-6 grid grid-cols-2 gap-3 mb-8">
-            <button onclick="prevStation()" class="py-4 bg-white rounded-2xl font-bold text-gray-600 shadow-sm active:scale-95 transition-all border border-gray-100">上一站</button>
-            <button onclick="nextStation()" class="py-4 bg-white rounded-2xl font-bold text-gray-600 shadow-sm active:scale-95 transition-all border border-gray-100">下一站</button>
-            <button onclick="manualAnnounce()" class="col-span-2 py-5 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-100 active:scale-95 transition-all flex justify-center items-center gap-2">
-                <span class="text-xl">📢</span> <span>手動播報 (目前站點)</span>
-            </button>
-        </div>
-
-        <!-- 內容區域 -->
-        <div class="px-6 pb-20">
-            <!-- 站點列表 (預估時間顯示於此) -->
-            <div id="tab-stations" class="space-y-3"></div>
-
-            <!-- 路線管理 -->
-            <div id="tab-routes" class="hidden space-y-4">
-                <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-                    <h3 class="font-black text-gray-800 mb-4 text-xs uppercase tracking-widest">📥 建立新路線</h3>
-                    <input id="new-route-name" type="text" placeholder="輸入路線名稱 (例：307 往西門)" class="w-full p-4 rounded-xl bg-gray-50 border-none ring-1 ring-gray-100 mb-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
-                    <textarea id="import-input" rows="4" class="w-full p-4 rounded-xl bg-gray-50 border-none ring-1 ring-gray-100 mb-4 text-xs font-mono outline-none" placeholder="格式：站名 緯度 經度"></textarea>
-                    <div class="grid grid-cols-2 gap-3">
-                        <button id="translate-btn" onclick="translateCurrentInput()" class="py-3 bg-blue-50 text-blue-600 rounded-xl font-bold text-sm">AI 預翻譯</button>
-                        <button id="save-btn" onclick="saveNewRoute()" class="py-3 bg-gray-900 text-white rounded-xl font-bold text-sm">儲存路線</button>
-                    </div>
-                </div>
-                <div id="saved-routes-list" class="space-y-3"></div>
-            </div>
-
-            <!-- 設定選項 -->
-            <div id="tab-settings" class="hidden space-y-4">
-                <div class="p-6 bg-white rounded-[2.5rem] border border-gray-100 space-y-7 shadow-sm">
-                    <h3 class="font-black text-gray-400 text-[10px] uppercase tracking-[0.2em]">語音偏好設定</h3>
-                    <div>
-                        <div class="flex justify-between mb-4"><span class="font-bold text-gray-700">主音量大小</span><span id="volume-val" class="font-black text-blue-600">1.0</span></div>
-                        <input type="range" id="speech-volume" min="0" max="1" step="0.1" value="1.0" class="w-full h-1.5 bg-gray-100 rounded-lg accent-blue-600" oninput="updateSpeechSetting('volume', this.value)">
-                    </div>
-                    <div>
-                        <div class="flex justify-between mb-4"><span class="font-bold text-gray-700">數位增益 (Boost)</span><span id="boost-val" class="font-black text-emerald-600">1.0x</span></div>
-                        <input type="range" id="speech-boost" min="1" max="3" step="0.1" value="1.0" class="w-full h-1.5 bg-gray-100 rounded-lg accent-emerald-600" oninput="updateSpeechSetting('boost', this.value)">
-                    </div>
-                    <div>
-                        <div class="flex justify-between mb-4"><span class="font-bold text-gray-700">語速快慢</span><span id="rate-val" class="font-black text-blue-600">1.0</span></div>
-                        <input type="range" id="speech-rate" min="0.5" max="2" step="0.1" value="1.0" class="w-full h-1.5 bg-gray-100 rounded-lg accent-blue-600" oninput="updateSpeechSetting('rate', this.value)">
-                    </div>
-                    <div class="pt-4 border-t border-gray-50">
-                        <button onclick="clearAllData()" class="w-full py-4 text-red-500 font-bold text-xs uppercase tracking-widest rounded-2xl hover:bg-red-50 border border-transparent hover:border-red-100 transition-all">刪除本機所有暫存資料</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 底部導覽列 -->
-        <div class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-sm glass rounded-[2.5rem] shadow-2xl p-2 flex justify-between items-center z-[100] border border-white">
-            <button onclick="switchTab('stations')" id="nav-stations" class="flex-1 py-3 flex flex-col items-center text-gray-400">
-                <span class="text-xl mb-0.5">📍</span><span class="text-[10px] font-black">站點列表</span>
-            </button>
-            <button onclick="switchTab('routes')" id="nav-routes" class="flex-1 py-3 flex flex-col items-center text-gray-400">
-                <span class="text-xl mb-0.5">🚌</span><span class="text-[10px] font-black">切換路線</span>
-            </button>
-            <button onclick="toggleGPSTracking()" class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center shadow-xl shadow-blue-200 -mt-12 border-4 border-white active:scale-90 transition-all">
-                <span class="text-2xl" id="gps-icon">🛰️</span>
-            </button>
-            <button onclick="switchTab('settings')" id="nav-settings" class="flex-1 py-3 flex flex-col items-center text-gray-400">
-                <span class="text-xl mb-0.5">⚙️</span><span class="text-[10px] font-black">設定選項</span>
-            </button>
-        </div>
+    <!-- 底部導覽 (經典固定底部) -->
+    <div id="bottom-nav" class="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-100 px-6 py-4 flex justify-around items-center">
+        <button onclick="switchTab('stations')" id="nav-stations" class="flex flex-col items-center gap-1 text-blue-600 flex-1">
+            <span class="text-2xl">📍</span><span class="text-[10px] font-black uppercase">站點列表</span>
+        </button>
+        <button onclick="switchTab('routes')" id="nav-routes" class="flex flex-col items-center gap-1 text-gray-400 flex-1">
+            <span class="text-2xl">🚌</span><span class="text-[10px] font-black uppercase">切換路線</span>
+        </button>
+        <button onclick="switchTab('settings')" id="nav-settings" class="flex flex-col items-center gap-1 text-gray-400 flex-1">
+            <span class="text-2xl">⚙️</span><span class="text-[10px] font-black uppercase">偏好設定</span>
+        </button>
     </div>
 
     <script type="module">
         import { doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
         import { signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
-        // --- 初始化參數 ---
         let allRoutes = JSON.parse(localStorage.getItem('bus_routes_v8')) || [];
         let currentRouteIndex = parseInt(localStorage.getItem('current_route_idx_v8')) || -1;
         let currentIndex = 0;
         let isTracking = false;
         let watchId = null;
-        let speechSettings = JSON.parse(localStorage.getItem('bus_speech_settings')) || { volume: 1.0, rate: 1.0, boost: 1.0 };
-        let audioCtx = null;
+        let speechSettings = JSON.parse(localStorage.getItem('bus_speech_settings')) || { volume: 1.0, rate: 1.0 };
         const apiKey = ""; 
 
-        // 離線預估：平均時速 25km/h (考慮市區停等) = 0.41km/min = 6.94m/s
-        const AVG_SPEED = 6.94; 
+        // 離線預估：平均時速 30km/h = 約 8.33 m/s
+        const AVG_SPEED = 8.33;
 
         window.onload = () => {
             renderRoutes();
             updateUI();
             initAuth();
-            switchTab('stations');
+            if (currentRouteIndex !== -1) {
+                switchTab('stations');
+            } else {
+                switchTab('routes');
+            }
         };
 
-        // --- Firebase 與 同步 ---
         async function initAuth() {
             const check = setInterval(async () => {
                 if (window.auth) {
@@ -250,15 +210,18 @@
                         } else {
                             await signInAnonymously(window.auth);
                         }
-                    } catch (e) { console.warn("Local Mode Active"); }
+                    } catch (e) { 
+                        const syncEl = document.getElementById('sync-status');
+                        if (syncEl) syncEl.innerText = "離線工作模式"; 
+                    }
                 }
             }, 100);
         }
 
         onAuthStateChanged(window.auth, (u) => {
             if (u) {
-                document.getElementById('sync-dot').className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
-                document.getElementById('sync-text').innerText = "雲端同步中";
+                const syncEl = document.getElementById('sync-status');
+                if (syncEl) syncEl.innerText = "雲端同步已就緒";
                 startSync(u.uid);
             }
         });
@@ -274,14 +237,7 @@
                     renderRoutes();
                     updateUI();
                 }
-            }, (err) => console.log("Cloud sync restricted"));
-        }
-
-        // --- 核心計算邏輯 ---
-        function calculateETA(distance) {
-            if (distance < 50) return "已抵達";
-            const mins = Math.ceil(distance / AVG_SPEED / 60);
-            return mins <= 1 ? "即將抵達" : `${mins} 分鐘`;
+            }, (e) => console.log("Sync error"));
         }
 
         function getDistance(lat1, lon1, lat2, lon2) {
@@ -290,28 +246,29 @@
             return R * 2 * Math.asin(Math.sqrt(a));
         }
 
-        // --- GPS 追蹤邏輯 ---
+        function formatETA(dist) {
+            if (dist < 60) return "抵達中";
+            const mins = Math.ceil(dist / AVG_SPEED / 60);
+            return mins <= 1 ? "即將抵達" : `${mins} 分鐘`;
+        }
+
         window.toggleGPSTracking = function() {
             if (isTracking) {
                 navigator.geolocation.clearWatch(watchId);
                 isTracking = false;
-                document.getElementById('tracking-indicator').classList.add('hidden');
-                document.getElementById('gps-icon').innerText = "🛰️";
-                document.getElementById('gps-speed').innerText = "0";
+                updateGPSButtonState(false);
             } else {
                 isTracking = true;
-                document.getElementById('tracking-indicator').classList.remove('hidden');
-                document.getElementById('gps-icon').innerText = "🛑";
-                
+                updateGPSButtonState(true);
                 watchId = navigator.geolocation.watchPosition(p => {
                     const { latitude: lat, longitude: lng, speed } = p.coords;
-                    document.getElementById('gps-speed').innerText = Math.round((speed || 0) * 3.6);
+                    const speedEl = document.getElementById('gps-speed');
+                    if (speedEl) speedEl.innerText = Math.round((speed || 0) * 3.6);
                     
                     if (currentRouteIndex === -1) return;
                     const r = allRoutes[currentRouteIndex];
                     let minD = Infinity, minI = currentIndex;
                     
-                    // 掃描最近站點 (通常為目前或下一站)
                     for(let i = currentIndex; i < Math.min(currentIndex + 3, r.stations.length); i++) {
                         const d = getDistance(lat, lng, r.stations[i].lat, r.stations[i].lng);
                         if (d < minD) { minD = d; minI = i; }
@@ -320,45 +277,33 @@
                     currentIndex = minI;
                     updateUI(minD);
                     
-                    // 自動報站閾值
                     if (minD <= 60) triggerAnnouncement(r.stations[currentIndex], "arrival");
                     else if (minD <= 500) triggerAnnouncement(r.stations[currentIndex], "next");
-                }, (err) => alert("請開啟 GPS 權限"), { enableHighAccuracy: true });
+                }, (e) => alert("請開啟定位權限"), { enableHighAccuracy: true });
             }
         };
 
-        // --- 語音報站系統 ---
-        async function ensureAudioCtx() {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioCtx.state === 'suspended') await audioCtx.resume();
-            return audioCtx;
-        }
-
-        async function playChime() {
-            const ctx = await ensureAudioCtx();
-            const now = ctx.currentTime;
-            const g = ctx.createGain();
-            g.gain.setValueAtTime(0.3 * speechSettings.volume * speechSettings.boost, now);
-            g.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
-            g.connect(ctx.destination);
-            
-            const osc = ctx.createOscillator();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(880, now);
-            osc.frequency.exponentialRampToValueAtTime(440, now + 0.6);
-            osc.connect(g);
-            osc.start(now); osc.stop(now + 0.8);
-            return new Promise(r => setTimeout(r, 700));
+        function updateGPSButtonState(active) {
+            const dot = document.getElementById('gps-dot-top');
+            const text = document.getElementById('gps-text-top');
+            if (dot && text) {
+                if (active) {
+                    dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                    text.innerText = "GPS 追蹤中";
+                } else {
+                    dot.className = "w-2 h-2 rounded-full bg-gray-500";
+                    text.innerText = "啟動 GPS";
+                }
+            }
         }
 
         function speak(text, lang) {
-            return new Promise(resolve => {
+            return new Promise(r => {
                 const u = new SpeechSynthesisUtterance(text);
                 u.lang = lang;
                 u.rate = speechSettings.rate;
                 u.volume = speechSettings.volume;
-                u.onend = resolve;
-                u.onerror = resolve;
+                u.onend = r; u.onerror = r;
                 window.speechSynthesis.speak(u);
             });
         }
@@ -370,7 +315,6 @@
             lastAnnounced = key;
 
             window.speechSynthesis.cancel();
-            await playChime();
             if (type === "arrival") {
                 await speak(`${station.name}，到了。`, 'zh-TW');
                 if (station.enName) await speak(`Arrived at, ${station.enName}`, 'en-US');
@@ -380,118 +324,132 @@
             }
         }
 
-        // --- UI 更新與渲染 ---
         window.updateUI = (distToCurr = null) => {
             if (currentRouteIndex === -1) return;
             const r = allRoutes[currentRouteIndex];
             const s = r.stations[currentIndex];
             
-            document.getElementById('current-station-name').innerText = s.name;
-            document.getElementById('current-station-en').innerText = s.enName || "No English Name";
+            const routeDisplay = document.getElementById('current-route-display');
+            const stationName = document.getElementById('current-station-name');
+            const stationEn = document.getElementById('current-station-en');
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+
+            if (routeDisplay) routeDisplay.innerText = r.name;
+            if (stationName) stationName.innerText = s.name;
+            if (stationEn) stationEn.innerText = s.enName || "No English Name";
             
             const prog = Math.round(((currentIndex + 1) / r.stations.length) * 100);
-            document.getElementById('route-progress').innerText = prog + '%';
-            document.getElementById('progress-bar-fill').style.width = prog + '%';
-            
-            if (distToCurr !== null) {
-                document.getElementById('dist-to-next').innerText = Math.round(distToCurr);
-                document.getElementById('eta-to-next').innerText = calculateETA(distToCurr);
-                document.getElementById('status-label').innerText = distToCurr <= 65 ? "到了 ARRIVED" : "下一站 NEXT";
-            }
+            if (progressBar) progressBar.style.width = prog + '%';
+            if (progressText) progressText.innerText = prog;
 
-            // 渲染站點列表 + 離線時間動態預估
-            const listHtml = r.stations.map((st, i) => {
-                let etaTag = "";
-                if (i > currentIndex) {
-                    let accDist = distToCurr || 0;
-                    for(let j = currentIndex; j < i; j++) {
-                        accDist += getDistance(r.stations[j].lat, r.stations[j].lng, r.stations[j+1].lat, r.stations[j+1].lng);
+            const tabStations = document.getElementById('tab-stations');
+            if (tabStations) {
+                tabStations.innerHTML = r.stations.map((st, i) => {
+                    let etaContent = "";
+                    if (i > currentIndex) {
+                        let accDist = distToCurr || 0;
+                        for(let j = currentIndex; j < i; j++) {
+                            accDist += getDistance(r.stations[j].lat, r.stations[j].lng, r.stations[j+1].lat, r.stations[j+1].lng);
+                        }
+                        etaContent = `<div class="text-right">
+                                        <p class="text-blue-600 font-black text-sm">${formatETA(accDist)}</p>
+                                        <p class="text-[8px] text-gray-400 font-bold">預計</p>
+                                      </div>`;
+                    } else if (i === currentIndex) {
+                        etaContent = `<span class="bg-emerald-500 text-white px-3 py-1 rounded-full text-[10px] font-black">目前站</span>`;
+                    } else {
+                        etaContent = `<span class="text-gray-300 text-[10px] font-bold">已通過</span>`;
                     }
-                    const time = calculateETA(accDist);
-                    etaTag = `<div class="flex flex-col items-end">
-                                <span class="text-blue-600 font-black text-xs">${time}</span>
-                                <span class="text-[8px] text-gray-300 font-bold uppercase">預估</span>
-                              </div>`;
-                } else if (i === currentIndex) {
-                    etaTag = `<span class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[10px] font-black border border-emerald-100">當前站</span>`;
-                } else {
-                    etaTag = `<span class="text-gray-300 text-[10px] font-bold">已過站</span>`;
-                }
 
-                return `
-                <div onclick="jumpTo(${i})" class="station-item p-5 rounded-2xl bg-white border border-gray-100 shadow-sm flex justify-between items-center ${i === currentIndex ? 'active-ring ring-2 ring-blue-100 shadow-blue-50' : 'opacity-60'}">
-                    <div class="flex-1 truncate pr-4">
-                        <h4 class="font-bold text-gray-800 text-lg truncate">${st.name}</h4>
-                        <p class="text-[10px] text-gray-400 font-bold uppercase truncate">${st.enName || '-'}</p>
-                    </div>
-                    ${etaTag}
-                </div>`;
-            }).join('');
-            document.getElementById('tab-stations').innerHTML = listHtml;
+                    return `
+                    <div onclick="jumpTo(${i})" class="station-card bg-white p-5 rounded-2xl border border-gray-100 flex justify-between items-center ${i === currentIndex ? 'station-active shadow-lg' : 'opacity-60'}">
+                        <div class="flex-1 truncate pr-4">
+                            <p class="font-black text-gray-800 text-xl truncate">${st.name}</p>
+                            <p class="text-[10px] text-gray-400 font-bold uppercase truncate tracking-widest">${st.enName || '-'}</p>
+                        </div>
+                        ${etaContent}
+                    </div>`;
+                }).join('');
+            }
         };
 
         window.renderRoutes = () => {
-            document.getElementById('saved-routes-list').innerHTML = allRoutes.map((r, i) => `
-                <div class="flex justify-between items-center p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
-                    <div class="flex-1">
-                        <div class="font-black text-gray-800">${r.name}</div>
-                        <div class="text-[10px] text-gray-400 font-bold uppercase">共 ${r.stations.length} 個站點</div>
+            const list = document.getElementById('saved-routes-list');
+            if (list) {
+                list.innerHTML = allRoutes.map((r, i) => `
+                    <div class="bg-white p-5 rounded-2xl border border-gray-100 flex justify-between items-center shadow-sm">
+                        <div>
+                            <p class="font-black text-gray-800">${r.name}</p>
+                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">${r.stations.length} STATIONS</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="loadRoute(${i})" class="bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-black shadow-md hover:bg-blue-700 transition-colors">載入</button>
+                            <button onclick="deleteRoute(${i})" class="text-gray-300 p-2 hover:text-red-500">🗑️</button>
+                        </div>
                     </div>
-                    <div class="flex gap-2">
-                        <button onclick="loadRoute(${i})" class="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-sm">載入</button>
-                        <button onclick="deleteRoute(${i})" class="p-2 text-gray-300 hover:text-red-500">🗑️</button>
-                    </div>
-                </div>
-            `).join('');
+                `).join('');
+            }
         };
 
-        window.loadRoute = async (i) => {
+        window.loadRoute = (i) => {
             currentRouteIndex = i;
             currentIndex = 0;
             localStorage.setItem('current_route_idx_v8', i);
             switchTab('stations');
             updateUI();
-            
-            // 語音載入提示
-            window.speechSynthesis.cancel();
-            await playChime();
-            await speak(`路線載入成功，${allRoutes[i].name}`, 'zh-TW');
         };
 
         window.switchTab = (t) => {
-            ['stations', 'routes', 'settings'].forEach(k => {
-                const el = document.getElementById(`tab-${k}`);
+            console.log("Switching to tab:", t);
+            const tabs = ['stations', 'routes', 'settings'];
+            tabs.forEach(k => {
+                const content = document.getElementById(`tab-${k}`);
                 const nav = document.getElementById(`nav-${k}`);
-                if(el) el.classList.toggle('hidden', k !== t);
-                if(nav) nav.classList.toggle('text-blue-600', k === t);
+                if (content) content.classList.toggle('hidden', k !== t);
+                if (nav) {
+                    nav.classList.toggle('text-blue-600', k === t);
+                    nav.classList.toggle('text-gray-400', k !== t);
+                }
             });
-            window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
-        // --- 控制功能 ---
-        window.jumpTo = (i) => { currentIndex = i; updateUI(); triggerAnnouncement(allRoutes[currentRouteIndex].stations[i], "arrival"); };
-        window.nextStation = () => { if(currentIndex < allRoutes[currentRouteIndex].stations.length-1) { currentIndex++; updateUI(); triggerAnnouncement(allRoutes[currentRouteIndex].stations[currentIndex], "next"); } };
-        window.prevStation = () => { if(currentIndex > 0) { currentIndex--; updateUI(); } };
-        window.manualAnnounce = () => { triggerAnnouncement(allRoutes[currentRouteIndex].stations[currentIndex], "arrival"); };
+        window.jumpTo = (i) => { currentIndex = i; updateUI(); };
+        window.nextStation = () => { 
+            if(currentRouteIndex !== -1 && currentIndex < allRoutes[currentRouteIndex].stations.length-1) { 
+                currentIndex++; 
+                updateUI(); 
+                triggerAnnouncement(allRoutes[currentRouteIndex].stations[currentIndex], "next"); 
+            } 
+        };
+        window.prevStation = () => { 
+            if(currentRouteIndex !== -1 && currentIndex > 0) { 
+                currentIndex--; 
+                updateUI(); 
+            } 
+        };
+        window.manualAnnounce = () => { 
+            if(currentRouteIndex !== -1) triggerAnnouncement(allRoutes[currentRouteIndex].stations[currentIndex], "arrival"); 
+        };
 
         window.updateSpeechSetting = (k, v) => {
             speechSettings[k] = parseFloat(v);
-            const display = document.getElementById(`${k}-val`);
-            if(display) display.innerText = k==='boost' ? v+'x' : v;
             localStorage.setItem('bus_speech_settings', JSON.stringify(speechSettings));
+            const volVal = document.getElementById('vol-val-lg');
+            const rateVal = document.getElementById('rate-val-lg');
+            if (k === 'volume' && volVal) volVal.innerText = v;
+            if (k === 'rate' && rateVal) rateVal.innerText = v;
         };
 
-        // --- 匯入與翻譯 ---
         window.translateCurrentInput = async () => {
             const area = document.getElementById('import-input');
             const lines = area.value.split('\n').filter(l => l.trim());
-            const btn = document.getElementById('translate-btn');
             if(!lines.length) return;
-            
-            btn.innerText = "AI 翻譯中...";
+            const btn = document.getElementById('translate-btn');
+            btn.innerText = "翻譯中...";
             try {
                 const names = lines.map(l => l.trim().split(/\s+/)[0]);
-                const prompt = `將以下公車站點名稱翻譯成英文。請僅回傳 JSON 物件格式：{"站名": "English Name"}。名稱：${names.join(", ")}`;
+                const prompt = `Translate bus station names to English JSON: {"StationName": "English Name"}. Names: ${names.join(",")}`;
                 const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                     method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
                 });
@@ -501,51 +459,56 @@
                     const zh = p[0];
                     return `${zh} [${dict[zh] || ''}] ${p[p.length-2]} ${p[p.length-1]}`;
                 }).join('\n');
-            } catch(e) { alert("翻譯失敗，請檢查網路或 API"); }
-            btn.innerText = "AI 預翻譯";
+            } catch(e) { alert("翻譯發生錯誤，請稍後再試。"); }
+            btn.innerText = "AI 翻譯站名";
         };
 
         window.saveNewRoute = async () => {
             const name = document.getElementById('new-route-name').value;
             const input = document.getElementById('import-input').value;
-            if(!name || !input) { alert("請填寫路線名稱與內容"); return; }
+            if(!name || !input) return;
 
-            const stations = input.split('\n').filter(l => l.trim()).map(line => {
-                const p = line.trim().split(/\s+/);
-                const lng = parseFloat(p.pop()), lat = parseFloat(p.pop());
-                const nPart = p.join(' ');
-                return { 
-                    name: nPart.replace(/\[.*?\]/, "").trim(), 
-                    enName: (nPart.match(/\[(.*?)\]/) || [])[1] || "", 
-                    lat, lng 
-                };
-            });
+            try {
+                const stations = input.split('\n').filter(l => l.trim()).map(line => {
+                    const p = line.trim().split(/\s+/);
+                    const lng = parseFloat(p.pop()), lat = parseFloat(p.pop());
+                    const nPart = p.join(' ');
+                    return { 
+                        name: nPart.replace(/\[.*?\]/, "").trim(), 
+                        enName: (nPart.match(/\[(.*?)\]/) || [])[1] || "", 
+                        lat, lng 
+                    };
+                });
 
-            const data = { id: `r_${Date.now()}`, name, stations };
-            allRoutes.push(data);
-            localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
-            
-            if(window.auth.currentUser) {
-                await setDoc(doc(window.db, 'artifacts', window.appId, 'users', window.auth.currentUser.uid, 'routes', data.id), data);
+                const data = { id: `r_${Date.now()}`, name, stations };
+                allRoutes.push(data);
+                localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
+                if(window.auth.currentUser) await setDoc(doc(window.db, 'artifacts', window.appId, 'users', window.auth.currentUser.uid, 'routes', data.id), data);
+                renderRoutes();
+                alert("路線已儲存");
+                document.getElementById('new-route-name').value = "";
+                document.getElementById('import-input').value = "";
+            } catch (e) {
+                alert("輸入格式錯誤，請確保最後兩項為緯度與經度數字。");
             }
-            
-            document.getElementById('new-route-name').value = "";
-            document.getElementById('import-input').value = "";
-            renderRoutes();
-            alert("路線儲存成功！");
         };
 
         window.deleteRoute = async (i) => {
-            if(confirm("確定要刪除這條路線嗎？")) {
+            if(confirm("確定刪除此路線？")) {
                 const r = allRoutes[i];
                 if(window.auth.currentUser) await deleteDoc(doc(window.db, 'artifacts', window.appId, 'users', window.auth.currentUser.uid, 'routes', r.id));
                 allRoutes.splice(i, 1);
                 localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
                 renderRoutes();
+                if (currentRouteIndex === i) {
+                    currentRouteIndex = -1;
+                    localStorage.removeItem('current_route_idx_v8');
+                    location.reload();
+                }
             }
         };
 
-        window.clearAllData = () => { if(confirm("確定要清空本機所有路線與設定嗎？此動作不可撤回。")) { localStorage.clear(); location.reload(); } };
+        window.clearAllData = () => { if(confirm("確定清空本機所有資料？")) { localStorage.clear(); location.reload(); } };
     </script>
 </body>
 </html>
