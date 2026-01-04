@@ -120,42 +120,35 @@
             return R * 2 * Math.asin(Math.sqrt(a));
         }
 
-        window.manualAnnounce = () => {
+        // 報站系統：兩次播報（下一站、到了）
+        window.manualAnnounce = async () => {
             if (currentRouteIdx === -1) return;
             const s = allRoutes[currentRouteIdx].stations[activeIdx];
             window.speechSynthesis.cancel();
-            
-            // 1. 到站播報提示音
+
+            const speak = (text, lang) => {
+                return new Promise((resolve) => {
+                    const u = new SpeechSynthesisUtterance(text);
+                    u.lang = lang;
+                    u.rate = speechSettings.rate;
+                    u.volume = speechSettings.volume;
+                    u.onend = resolve;
+                    window.speechSynthesis.speak(u);
+                });
+            };
+
+            // 第一階段：播報「下一站」 (中英各一次)
+            await speak(`下一站，${s.name}`, 'zh-TW');
+            await speak(`Next station, ${s.enName || 'this station'}`, 'en-US');
+
+            // 停頓一秒模擬車程
+            await new Promise(r => setTimeout(r, 1000));
+
+            // 第二階段：播報「到了」 (提示音 + 中英各一次)
             playDing();
-            
-            setTimeout(() => {
-                // 2. 中文播報 2 次
-                const uZh1 = new SpeechSynthesisUtterance(`${s.name}，到了。`);
-                uZh1.lang = 'zh-TW';
-                uZh1.rate = speechSettings.rate;
-                uZh1.volume = speechSettings.volume;
-
-                const uZh2 = new SpeechSynthesisUtterance(`${s.name}，到了。`);
-                uZh2.lang = 'zh-TW';
-                uZh2.rate = speechSettings.rate;
-                uZh2.volume = speechSettings.volume;
-                
-                // 3. 英文播報 2 次
-                const uEn1 = new SpeechSynthesisUtterance(`Arrived at, ${s.enName || 'this station'}`);
-                uEn1.lang = 'en-US';
-                uEn1.rate = speechSettings.rate;
-                uEn1.volume = speechSettings.volume;
-
-                const uEn2 = new SpeechSynthesisUtterance(`Arrived at, ${s.enName || 'this station'}`);
-                uEn2.lang = 'en-US';
-                uEn2.rate = speechSettings.rate;
-                uEn2.volume = speechSettings.volume;
-
-                window.speechSynthesis.speak(uZh1);
-                window.speechSynthesis.speak(uZh2);
-                window.speechSynthesis.speak(uEn1);
-                window.speechSynthesis.speak(uEn2);
-            }, 300); 
+            await new Promise(r => setTimeout(r, 300)); // 等提示音播完
+            await speak(`${s.name}，到了。`, 'zh-TW');
+            await speak(`Arrived at, ${s.enName || 'this station'}`, 'en-US');
         };
 
         // ==========================================
