@@ -3,47 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>智慧 GPS 公車報站系統</title>
+    <title>智慧 GPS 公車報站系統 - 同步版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
-        // ==========================================
-        // 1. Firebase 配置位置
-        // 如果是在此 Canvas 環境運行，系統會自動注入 __firebase_config
-        // 如果您是在外部環境運行，請將 Firebase 控制台獲得的 Config 物件填入下方
-        // ==========================================
-        let firebaseConfig = {  apiKey: "AIzaSyAZIM0cr-uhBtGyYd7_ddmmLH41h0PxBro",
-  authDomain: "busts-a64c2.firebaseapp.com",
-  projectId: "busts-a64c2",
-  storageBucket: "busts-a64c2.firebasestorage.app",
-  messagingSenderId: "684162202156",
-  appId: "1:684162202156:web:b868e5b8341dd1c683af89"};
+        let firebaseConfig = {  
+            apiKey: "AIzaSyAZIM0cr-uhBtGyYd7_ddmmLH41h0PxBro",
+            authDomain: "busts-a64c2.firebaseapp.com",
+            projectId: "busts-a64c2",
+            storageBucket: "busts-a64c2.firebasestorage.app",
+            messagingSenderId: "684162202156",
+            appId: "1:684162202156:web:b868e5b8341dd1c683af89"
+        };
+        
         try {
             if (typeof __firebase_config !== 'undefined') {
                 firebaseConfig = JSON.parse(__firebase_config);
-            } else {
-                /* // 外部運行範例：
-                firebaseConfig = {
-                    apiKey: "您的_API_KEY",
-                    authDomain: "您的_PROJECT_ID.firebaseapp.com",
-                    projectId: "您的_PROJECT_ID",
-                    storageBucket: "您的_PROJECT_ID.appspot.com",
-                    messagingSenderId: "您的_SENDER_ID",
-                    appId: "您的_APP_ID"
-                };
-                */
             }
-        } catch (e) {
-            console.error("Firebase config error", e);
-        }
+        } catch (e) { console.error("Firebase config error", e); }
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'bus-announcer-v8-classic';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'bus-announcer-v8-sync';
 
         window.db = db;
         window.auth = auth;
@@ -51,66 +36,14 @@
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        
-        :root {
-            --nav-height: 70px;
-        }
-
-        body { 
-            font-family: 'Inter', 'Noto Sans TC', sans-serif; 
-            background-color: #f0f2f5; 
-            margin: 0; 
-            padding: 0;
-            width: 100vw;
-            height: 100vh;
-            overflow-x: hidden;
-        }
-
-        .nav-btn {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 2px;
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            z-index: 10001;
-            pointer-events: auto !important;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        #bottom-nav { 
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: var(--nav-height);
-            z-index: 2147483647; 
-            background-color: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(10px);
-            border-top: 1px solid #e5e7eb;
-            display: flex;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-            pointer-events: auto;
-        }
-
-        .main-content { 
-            padding-bottom: calc(var(--nav-height) + 20px); 
-            position: relative;
-            z-index: 1;
-        }
-
+        :root { --nav-height: 70px; }
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f0f2f5; margin: 0; padding: 0; width: 100vw; height: 100vh; overflow-x: hidden; }
+        .nav-btn { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: transparent; border: none; cursor: pointer; z-index: 10001; pointer-events: auto !important; }
+        #bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: var(--nav-height); z-index: 2147483647; background-color: rgba(255, 255, 255, 0.98); backdrop-filter: blur(10px); border-top: 1px solid #e5e7eb; display: flex; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
+        .main-content { padding-bottom: calc(var(--nav-height) + 20px); position: relative; z-index: 1; }
         .station-card { transition: all 0.2s ease; cursor: pointer; }
         .station-active { border-left: 8px solid #2563eb; background-color: #eff6ff; }
-
-        @media (min-width: 1024px) {
-            .app-container { display: grid; grid-template-columns: 1fr 1.2fr; gap: 2rem; align-items: start; }
-            .sticky-panel { position: sticky; top: 100px; }
-            .scrollable-list { height: calc(100vh - 220px); overflow-y: auto; padding-right: 10px; }
-        }
+        @media (min-width: 1024px) { .app-container { display: grid; grid-template-columns: 1fr 1.2fr; gap: 2rem; align-items: start; } .sticky-panel { position: sticky; top: 100px; } .scrollable-list { height: calc(100vh - 220px); overflow-y: auto; padding-right: 10px; } }
     </style>
 </head>
 <body class="main-content">
@@ -119,8 +52,8 @@
             <div class="flex items-center gap-4">
                 <div class="bg-blue-600 p-2 rounded-lg">🚌</div>
                 <div>
-                    <h1 class="font-black text-lg lg:text-xl tracking-tight leading-none">智慧 GPS 公車報站系統</h1>
-                    <p id="sync-status" class="text-[10px] text-slate-400 font-bold uppercase mt-1">載入中...</p>
+                    <h1 class="font-black text-lg lg:text-xl tracking-tight leading-none">智慧 GPS 報站同步版</h1>
+                    <p id="sync-status" class="text-[10px] text-slate-400 font-bold uppercase mt-1">初始化...</p>
                 </div>
             </div>
             <div class="flex items-center gap-4 lg:gap-6">
@@ -128,7 +61,7 @@
                     <div id="gps-speed" class="text-2xl lg:text-3xl font-black text-emerald-400">0</div>
                     <div class="text-[8px] font-bold text-slate-400 uppercase">km/h</div>
                 </div>
-                <button onclick="toggleGPSTracking()" class="bg-slate-800 px-3 py-1.5 lg:px-4 lg:py-2 rounded-full border border-slate-700 text-[10px] font-black flex items-center gap-2 active:scale-95 transition-all">
+                <button onclick="toggleGPSTracking()" class="bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 text-[10px] font-black flex items-center gap-2">
                     <span id="gps-dot-top" class="w-2 h-2 rounded-full bg-gray-500"></span>
                     <span id="gps-text-top">GPS</span>
                 </button>
@@ -139,24 +72,32 @@
     <main class="max-w-7xl mx-auto p-4 lg:p-8">
         <div class="app-container">
             <div class="sticky-panel space-y-6">
-                <div class="bg-white rounded-3xl shadow-xl p-6 lg:p-8 border border-gray-100 relative overflow-hidden">
+                <div class="bg-white rounded-3xl shadow-xl p-6 border border-gray-100 relative overflow-hidden">
                     <div class="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
                     <div class="flex justify-between items-center mb-2">
                         <span id="current-route-display" class="bg-slate-100 text-slate-600 px-3 py-1 rounded text-[10px] font-black">未選取路線</span>
                         <div class="text-[10px] font-black text-blue-600"><span id="progress-text">0</span>%</div>
                     </div>
                     <h2 id="current-station-name" class="text-3xl lg:text-5xl font-black text-gray-800 mb-1 truncate">請載入路線</h2>
-                    <p id="current-station-en" class="text-gray-400 font-bold text-sm lg:text-lg mb-6 truncate uppercase">Ready</p>
-                    <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden mb-6">
+                    <p id="current-station-en" class="text-gray-400 font-bold text-sm truncate uppercase">Ready</p>
+                    <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden mb-6 mt-4">
                         <div id="progress-bar" class="bg-blue-600 h-full transition-all duration-700" style="width: 0%"></div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <button onclick="prevStation()" class="bg-gray-50 border border-gray-200 py-3 rounded-xl font-black text-gray-600 active:scale-95">上一站</button>
                         <button onclick="nextStation()" class="bg-gray-50 border border-gray-200 py-3 rounded-xl font-black text-gray-600 active:scale-95">下一站</button>
-                        <button onclick="manualAnnounce()" class="col-span-2 bg-slate-900 text-white py-4 rounded-xl font-black text-lg shadow-lg active:scale-95 flex items-center justify-center gap-2">
-                            <span>📢</span> 立即報站
-                        </button>
+                        <button onclick="manualAnnounce()" class="col-span-2 bg-slate-900 text-white py-4 rounded-xl font-black text-lg shadow-lg active:scale-95 flex items-center justify-center gap-2">📢 立即報站</button>
                     </div>
+                </div>
+
+                <!-- 同步碼區塊 (跨裝置關鍵) -->
+                <div class="bg-emerald-50 p-6 rounded-3xl border border-emerald-100">
+                    <h3 class="text-emerald-800 font-black text-xs uppercase tracking-widest mb-3">跨裝置同步碼</h3>
+                    <div class="flex gap-2">
+                        <input id="sync-code-input" type="text" class="flex-1 p-3 bg-white border border-emerald-200 rounded-xl font-mono font-bold text-emerald-700 outline-none" placeholder="輸入同步碼">
+                        <button onclick="applySyncCode()" class="bg-emerald-600 text-white px-4 py-2 rounded-xl font-black text-xs">套用</button>
+                    </div>
+                    <p class="text-[9px] text-emerald-600/60 mt-2 font-bold">在另一台裝置輸入相同的代碼即可同步路線清單。</p>
                 </div>
             </div>
 
@@ -170,12 +111,12 @@
 
                 <div id="tab-routes" style="display: none;" class="space-y-6">
                     <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-                        <h3 class="font-black text-gray-800 mb-4 uppercase text-xs tracking-widest text-gray-400">建立新路線</h3>
-                        <input id="new-route-name" type="text" placeholder="路線名稱 (例如：101公車)" class="w-full p-4 bg-gray-50 rounded-xl mb-3 font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                        <textarea id="import-input" rows="4" class="w-full p-4 bg-gray-50 rounded-xl mb-4 text-xs font-mono border-none outline-none focus:ring-2 focus:ring-blue-500" placeholder="格式：站名 緯度 經度"></textarea>
+                        <h3 class="font-black text-gray-800 mb-4 uppercase text-xs tracking-widest text-gray-400">建立新路線 (將同步至雲端)</h3>
+                        <input id="new-route-name" type="text" placeholder="路線名稱" class="w-full p-4 bg-gray-50 rounded-xl mb-3 font-bold border-none outline-none text-sm">
+                        <textarea id="import-input" rows="4" class="w-full p-4 bg-gray-50 rounded-xl mb-4 text-xs font-mono border-none outline-none" placeholder="站名 緯度 經度"></textarea>
                         <div class="grid grid-cols-2 gap-3">
                             <button id="translate-btn" onclick="translateCurrentInput()" class="bg-blue-50 text-blue-600 py-3 rounded-xl font-black text-sm">AI 翻譯英文</button>
-                            <button onclick="saveNewRoute()" class="bg-blue-600 text-white py-3 rounded-xl font-black text-sm shadow-md">儲存路線</button>
+                            <button onclick="saveNewRoute()" class="bg-blue-600 text-white py-3 rounded-xl font-black text-sm shadow-md">儲存並上傳</button>
                         </div>
                     </div>
                     <div id="saved-routes-list" class="space-y-3"></div>
@@ -194,7 +135,7 @@
                                 <input type="range" min="0.5" max="2" step="0.1" value="1" oninput="updateSpeechSetting('rate', this.value)" class="w-full accent-blue-600">
                             </div>
                         </div>
-                        <button onclick="clearAllData()" class="w-full text-red-500 font-black py-4 border-2 border-red-500 rounded-2xl active:bg-red-50">清除所有資料</button>
+                        <button onclick="clearAllData()" class="w-full text-red-500 font-black py-4 border-2 border-red-500 rounded-2xl active:bg-red-50">重設所有資料</button>
                     </div>
                 </div>
             </div>
@@ -208,11 +149,11 @@
         </button>
         <button onclick="switchTab('routes')" id="nav-routes" class="nav-btn text-gray-400">
             <span class="text-2xl">🚌</span>
-            <span class="text-[10px] font-black uppercase">切換路線</span>
+            <span class="text-[10px] font-black uppercase">同步路線</span>
         </button>
         <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn text-gray-400">
             <span class="text-2xl">⚙️</span>
-            <span class="text-[10px] font-black uppercase">系統設定</span>
+            <span class="text-[10px] font-black uppercase">設定</span>
         </button>
     </div>
 
@@ -220,346 +161,105 @@
         import { doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
         import { signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
-        // ==========================================
-        // 2. Google Gemini API Key 填入位置
-        // 請到 Google AI Studio (aistudio.google.com) 取得 API Key
-        // ==========================================
-        const apiKey = "AIzaSyCj3QnqcghN1tBrZSxq-H3PWaU4xzYCk1A"; // <--- 填入您的 Google API Key
+        const geminiApiKey = "AIzaSyCj3QnqcghN1tBrZSxq-H3PWaU4xzYCk1A";
 
-        let allRoutes = JSON.parse(localStorage.getItem('bus_routes_v8')) || [];
-        let currentRouteIndex = parseInt(localStorage.getItem('current_route_idx_v8')) || -1;
+        // 狀態管理
+        let currentSyncCode = localStorage.getItem('bus_sync_code') || Math.random().toString(36).substring(2, 8).toUpperCase();
+        let allRoutes = [];
+        let currentRouteIndex = -1;
         let currentIndex = 0;
         let isTracking = false;
         let watchId = null;
+        let unsubscribeSync = null;
         let speechSettings = JSON.parse(localStorage.getItem('bus_speech_settings')) || { volume: 1.0, rate: 1.0 };
-        
-        // 音效合成器
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        /**
-         * 播放合成音效 (類似現代電子提示音)
-         */
+        // 語音與音效
         function playSignal() {
             return new Promise(resolve => {
                 const now = audioCtx.currentTime;
-                // 第一聲
                 const osc1 = audioCtx.createOscillator();
                 const gain1 = audioCtx.createGain();
-                osc1.type = 'sine';
-                osc1.frequency.setValueAtTime(880, now); // A5
+                osc1.type = 'sine'; osc1.frequency.setValueAtTime(880, now);
                 gain1.gain.setValueAtTime(0, now);
                 gain1.gain.linearRampToValueAtTime(0.2 * speechSettings.volume, now + 0.05);
                 gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-                osc1.connect(gain1);
-                gain1.connect(audioCtx.destination);
-                osc1.start(now);
-                osc1.stop(now + 0.2);
-
-                // 第二聲
-                const osc2 = audioCtx.createOscillator();
-                const gain2 = audioCtx.createGain();
-                osc2.type = 'sine';
-                osc2.frequency.setValueAtTime(1046.5, now + 0.2); // C6
-                gain2.gain.setValueAtTime(0, now + 0.2);
-                gain2.gain.linearRampToValueAtTime(0.2 * speechSettings.volume, now + 0.25);
-                gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-                osc2.connect(gain2);
-                gain2.connect(audioCtx.destination);
-                osc2.start(now + 0.2);
-                osc2.stop(now + 0.4);
-
+                osc1.connect(gain1); gain1.connect(audioCtx.destination);
+                osc1.start(now); osc1.stop(now + 0.2);
                 setTimeout(resolve, 500);
             });
         }
 
-        window.switchTab = (t) => {
-            const tabs = ['stations', 'routes', 'settings'];
-            tabs.forEach(k => {
-                const content = document.getElementById(`tab-${k}`);
-                const nav = document.getElementById(`nav-${k}`);
-                if (content) content.style.display = (k === t) ? 'block' : 'none';
-                if (nav) {
-                    nav.classList.toggle('text-blue-600', k === t);
-                    nav.classList.toggle('text-gray-400', k !== t);
-                }
-            });
-            window.scrollTo(0, 0);
-        };
-
-        window.onload = () => {
-            renderRoutes();
-            updateUI();
-            initAuth();
-            if (currentRouteIndex === -1) window.switchTab('routes');
-        };
-
-        async function initAuth() {
-            const check = setInterval(async () => {
-                if (window.auth) {
-                    clearInterval(check);
-                    try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(window.auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(window.auth);
-                        }
-                    } catch (e) { 
-                        document.getElementById('sync-status').innerText = "離線工作模式"; 
-                    }
-                }
-            }, 100);
-        }
-
-        onAuthStateChanged(window.auth, (u) => {
-            if (u) {
-                document.getElementById('sync-status').innerText = "雲端同步中";
-                startSync(u.uid);
-            } else {
-                document.getElementById('sync-status').innerText = "離線工作模式";
-            }
-        });
-
-        function startSync(uid) {
-            const q = query(collection(window.db, 'artifacts', window.appId, 'users', uid, 'routes'));
-            onSnapshot(q, (snap) => {
-                const cloud = [];
-                snap.forEach(d => cloud.push({ id: d.id, ...d.data() }));
-                if (cloud.length > 0) {
-                    allRoutes = cloud;
-                    localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
-                    document.getElementById('sync-status').innerText = "雲端資料已就緒";
-                    renderRoutes();
-                    updateUI();
-                }
-            }, (err) => {
-                document.getElementById('sync-status').innerText = "離線 (同步暫停)";
-            });
-        }
-
-        function getDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3, p = Math.PI/180;
-            const a = 0.5 - Math.cos((lat2-lat1)*p)/2 + Math.cos(lat1*p)*Math.cos(lat2*p)*(1-Math.cos((lon2-lon1)*p))/2;
-            return R * 2 * Math.asin(Math.sqrt(a));
-        }
-
-        window.toggleGPSTracking = function() {
-            if (isTracking) {
-                navigator.geolocation.clearWatch(watchId);
-                isTracking = false;
-                updateGPSButtonState(false);
-            } else {
-                if (audioCtx.state === 'suspended') audioCtx.resume();
-                isTracking = true;
-                updateGPSButtonState(true);
-                watchId = navigator.geolocation.watchPosition(p => {
-                    const { latitude: lat, longitude: lng, speed } = p.coords;
-                    document.getElementById('gps-speed').innerText = Math.round((speed || 0) * 3.6);
-                    if (currentRouteIndex === -1) return;
-                    const r = allRoutes[currentRouteIndex];
-                    let minD = Infinity, minI = currentIndex;
-                    for(let i = currentIndex; i < Math.min(currentIndex + 3, r.stations.length); i++) {
-                        const d = getDistance(lat, lng, r.stations[i].lat, r.stations[i].lng);
-                        if (d < minD) { minD = d; minI = i; }
-                    }
-                    currentIndex = minI;
-                    updateUI(minD);
-                    if (minD <= 50) triggerAnnouncement(r.stations[currentIndex], "arrival");
-                }, (e) => alert("GPS 啟動失敗"), { enableHighAccuracy: true });
-            }
-        };
-
-        function updateGPSButtonState(active) {
-            const dot = document.getElementById('gps-dot-top');
-            const text = document.getElementById('gps-text-top');
-            dot.className = active ? "w-2 h-2 rounded-full bg-emerald-500 animate-pulse" : "w-2 h-2 rounded-full bg-gray-500";
-            text.innerText = active ? "監測中" : "GPS";
-        }
-
-        function speak(text, lang) {
+        async function speak(text, lang) {
             return new Promise(r => {
                 const u = new SpeechSynthesisUtterance(text);
-                u.lang = lang;
-                u.rate = speechSettings.rate;
-                u.volume = speechSettings.volume;
+                u.lang = lang; u.rate = speechSettings.rate; u.volume = speechSettings.volume;
                 u.onend = r; u.onerror = r;
                 window.speechSynthesis.speak(u);
             });
         }
 
-        let lastAnnounced = "";
-        async function triggerAnnouncement(station, type) {
-            const key = `${station.name}_${type}`;
-            if (lastAnnounced === key) return;
-            lastAnnounced = key;
-            window.speechSynthesis.cancel();
-
-            if (type === "arrival") {
-                await playSignal(); // 播放提示音
-                await speak(`${station.name}，到了。`, 'zh-TW');
-                if (station.enName) {
-                    await speak(`Arrived at ${station.enName}`, 'en-US');
-                }
-            } else if (type === "next") {
-                await speak(`下一站，${station.name}`, 'zh-TW');
-                if (station.enName) {
-                    await speak(`Next stop, ${station.enName}`, 'en-US');
-                }
-            } else if (type === "system") {
-                await speak(station, 'zh-TW');
-            }
-        }
-
-        window.updateUI = (distToCurr = null) => {
-            if (currentRouteIndex === -1 || !allRoutes[currentRouteIndex]) return;
-            const r = allRoutes[currentRouteIndex];
-            const s = r.stations[currentIndex];
-            if (!s) return;
-            document.getElementById('current-route-display').innerText = r.name;
-            document.getElementById('current-station-name').innerText = s.name;
-            document.getElementById('current-station-en').innerText = s.enName || "No English";
-            const prog = Math.round(((currentIndex + 1) / r.stations.length) * 100);
-            document.getElementById('progress-bar').style.width = prog + '%';
-            document.getElementById('progress-text').innerText = prog;
-            const tabStations = document.getElementById('tab-stations');
-            tabStations.innerHTML = r.stations.map((st, i) => `
-                <div onclick="jumpTo(${i})" class="station-card bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center ${i === currentIndex ? 'station-active shadow-md' : 'opacity-60'}">
-                    <div class="pointer-events-none">
-                        <p class="font-black text-gray-800 text-lg">${st.name}</p>
-                        <p class="text-[9px] text-gray-400 font-bold uppercase">${st.enName || '-'}</p>
-                    </div>
-                    ${i === currentIndex ? '<span class="bg-emerald-500 text-white px-3 py-1 rounded-full text-[9px] font-black pointer-events-none">目前</span>' : ''}
-                </div>
-            `).join('');
-        };
-
-        window.renderRoutes = () => {
-            const list = document.getElementById('saved-routes-list');
-            if (!list) return;
-            list.innerHTML = allRoutes.map((r, i) => `
-                <div class="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center shadow-sm">
-                    <div>
-                        <p class="font-black text-gray-800 text-sm">${r.name}</p>
-                        <p class="text-[9px] text-gray-400 font-bold uppercase">${r.stations.length} 站點</p>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="loadRoute(${i})" class="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-[10px] font-black">載入</button>
-                        <button onclick="deleteRoute(${i})" class="text-gray-300 px-1 hover:text-red-500">🗑️</button>
-                    </div>
-                </div>
-            `).join('');
-        };
-
-        window.loadRoute = async (i) => {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            currentRouteIndex = i;
-            currentIndex = 0;
-            const route = allRoutes[i];
-            localStorage.setItem('current_route_idx_v8', i);
-            window.switchTab('stations');
+        // 初始化與認證
+        window.onload = () => {
+            document.getElementById('sync-code-input').value = currentSyncCode;
+            initAuth();
             updateUI();
-
-            window.speechSynthesis.cancel();
-            await playSignal(); // 播放載入提示音
-            await triggerAnnouncement(`已載入路線：${route.name}`, "system");
         };
 
-        window.jumpTo = (i) => { currentIndex = i; updateUI(); };
-        window.nextStation = () => { 
-            if(currentRouteIndex !== -1 && currentIndex < allRoutes[currentRouteIndex].stations.length - 1) { 
-                currentIndex++; 
-                updateUI(); 
-                triggerAnnouncement(allRoutes[currentRouteIndex].stations[currentIndex], "next");
-            } 
-        };
-        window.prevStation = () => { if(currentRouteIndex !== -1 && currentIndex > 0) { currentIndex--; updateUI(); } };
-        window.manualAnnounce = () => { if(currentRouteIndex !== -1) triggerAnnouncement(allRoutes[currentRouteIndex].stations[currentIndex], "arrival"); };
-
-        window.updateSpeechSetting = (k, v) => {
-            speechSettings[k] = parseFloat(v);
-            localStorage.setItem('bus_speech_settings', JSON.stringify(speechSettings));
-        };
-
-        async function callTranslateAPI(prompt) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            const payload = {
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { 
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "OBJECT",
-                        properties: {
-                            translations: {
-                                type: "ARRAY",
-                                items: {
-                                    type: "OBJECT",
-                                    properties: {
-                                        original: { type: "STRING" },
-                                        translated: { type: "STRING" }
-                                    }
-                                }
-                            }
-                        }
-                    }
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(window.auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(window.auth);
                 }
-            };
-
-            let delay = 1000;
-            for (let i = 0; i < 5; i++) {
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    const result = await response.json();
-                    return JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text);
-                } catch (error) {
-                    if (i === 4) throw error;
-                    await new Promise(r => setTimeout(r, delay));
-                    delay *= 2;
-                }
+            } catch (e) {
+                document.getElementById('sync-status').innerText = "離線工作模式";
             }
         }
 
-        window.translateCurrentInput = async () => {
-            const area = document.getElementById('import-input');
-            const lines = area.value.split('\n').filter(l => l.trim());
-            if(!lines.length) return;
-            
-            const btn = document.getElementById('translate-btn');
-            const originalText = btn.innerText;
-            btn.innerText = "翻譯中...";
-
-            try {
-                const names = lines.map(l => l.trim().split(/\s+/)[0]);
-                const prompt = `Translate these Chinese bus station names to English accurately: ${names.join(",")}. Return a JSON with 'translations' array of {original, translated}.`;
-                
-                const data = await callTranslateAPI(prompt);
-                const dict = {};
-                data.translations.forEach(item => {
-                    dict[item.original] = item.translated;
-                });
-
-                area.value = lines.map(l => {
-                    const p = l.trim().split(/\s+/);
-                    const stationName = p[0];
-                    const lat = p[p.length - 2];
-                    const lng = p[p.length - 1];
-                    const eng = dict[stationName] || 'Unknown';
-                    return `${stationName} [${eng}] ${lat} ${lng}`;
-                }).join('\n');
-            } catch(e) { 
-                alert("翻譯失敗，請檢查 API Key 是否正確或網路連線。"); 
-            } finally {
-                btn.innerText = originalText;
+        onAuthStateChanged(window.auth, (u) => {
+            if (u) {
+                document.getElementById('sync-status').innerText = "雲端連線成功";
+                startSync();
             }
+        });
+
+        // 雲端同步核心 (關鍵：基於公共同步碼)
+        function startSync() {
+            if (unsubscribeSync) unsubscribeSync();
+            
+            // 使用公共路徑以便跨裝置讀取相同的同步碼資料
+            const q = query(collection(window.db, 'artifacts', window.appId, 'public', 'data', currentSyncCode));
+            
+            unsubscribeSync = onSnapshot(q, (snap) => {
+                const cloud = [];
+                snap.forEach(d => cloud.push({ id: d.id, ...d.data() }));
+                allRoutes = cloud;
+                document.getElementById('sync-status').innerText = `同步碼: ${currentSyncCode} (已載入 ${cloud.length} 條路線)`;
+                renderRoutes();
+                updateUI();
+            }, (err) => {
+                console.error(err);
+                document.getElementById('sync-status').innerText = "同步權限錯誤";
+            });
+        }
+
+        window.applySyncCode = () => {
+            const code = document.getElementById('sync-code-input').value.trim().toUpperCase();
+            if (!code) return;
+            currentSyncCode = code;
+            localStorage.setItem('bus_sync_code', code);
+            startSync();
+            alert(`已切換至同步碼: ${code}`);
         };
 
+        // 路線管理
         window.saveNewRoute = async () => {
             const name = document.getElementById('new-route-name').value;
             const input = document.getElementById('import-input').value;
-            if(!name || !input) return alert("資訊不完整");
+            if (!name || !input) return alert("請填寫名稱與站點內容");
+
             try {
                 const stations = input.split('\n').filter(l => l.trim()).map(line => {
                     const p = line.trim().split(/\s+/);
@@ -568,34 +268,162 @@
                     return { 
                         name: nPart.replace(/\[.*?\]/, "").trim(), 
                         enName: (nPart.match(/\[(.*?)\]/) || [])[1] || "", 
-                        lat, 
-                        lng 
+                        lat, lng 
                     };
                 });
-                const data = { id: `r_${Date.now()}`, name, stations };
-                allRoutes.push(data);
-                localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
-                if (window.auth && window.auth.currentUser) {
-                    await setDoc(doc(window.db, 'artifacts', window.appId, 'users', window.auth.currentUser.uid, 'routes', data.id), data);
-                }
-                renderRoutes();
-                alert("儲存成功");
-            } catch (e) { alert("解析失敗"); }
+                const routeId = `r_${Date.now()}`;
+                const data = { id: routeId, name, stations, lastUpdated: Date.now() };
+
+                // 寫入雲端 (所有輸入相同同步碼的人都會看到)
+                await setDoc(doc(window.db, 'artifacts', window.appId, 'public', 'data', currentSyncCode, routeId), data);
+                
+                document.getElementById('new-route-name').value = "";
+                document.getElementById('import-input').value = "";
+                alert("路線已儲存並同步至雲端！");
+                switchTab('stations');
+            } catch (e) { alert("解析失敗，請確認格式：站名 緯度 經度"); }
         };
 
-        window.deleteRoute = async (i) => {
-            if(confirm("刪除？")) {
-                const r = allRoutes[i];
-                allRoutes.splice(i, 1);
-                localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
-                if(window.auth && window.auth.currentUser) {
-                    try { await deleteDoc(doc(window.db, 'artifacts', window.appId, 'users', window.auth.currentUser.uid, 'routes', r.id)); } catch(e) {}
-                }
-                renderRoutes();
+        window.deleteRoute = async (id) => {
+            if (confirm("確定從雲端刪除此路線？所有裝置都將失去此資料。")) {
+                await deleteDoc(doc(window.db, 'artifacts', window.appId, 'public', 'data', currentSyncCode, id));
             }
         };
 
-        window.clearAllData = () => { if(confirm("確定清空？")) { localStorage.clear(); location.reload(); } };
+        window.loadRoute = (i) => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            currentRouteIndex = i;
+            currentIndex = 0;
+            switchTab('stations');
+            updateUI();
+            playSignal().then(() => speak(`已載入路線 ${allRoutes[i].name}`, 'zh-TW'));
+        };
+
+        // GPS 與 UI 控制 (略有優化)
+        window.toggleGPSTracking = () => {
+            if (isTracking) {
+                navigator.geolocation.clearWatch(watchId);
+                isTracking = false;
+                updateGPSUI(false);
+            } else {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                isTracking = true;
+                updateGPSUI(true);
+                watchId = navigator.geolocation.watchPosition(p => {
+                    const { latitude: lat, longitude: lng, speed } = p.coords;
+                    document.getElementById('gps-speed').innerText = Math.round((speed || 0) * 3.6);
+                    if (currentRouteIndex === -1) return;
+                    
+                    const r = allRoutes[currentRouteIndex];
+                    let minD = Infinity, minI = currentIndex;
+                    // 只檢查當前站與後兩站
+                    for (let i = currentIndex; i < Math.min(currentIndex + 3, r.stations.length); i++) {
+                        const d = getDist(lat, lng, r.stations[i].lat, r.stations[i].lng);
+                        if (d < minD) { minD = d; minI = i; }
+                    }
+                    if (minI !== currentIndex || minD < 50) {
+                        const oldIdx = currentIndex;
+                        currentIndex = minI;
+                        updateUI();
+                        if (minD < 50 && oldIdx !== currentIndex) manualAnnounce();
+                    }
+                }, () => alert("GPS 啟動失敗"), { enableHighAccuracy: true });
+            }
+        };
+
+        function updateGPSUI(active) {
+            document.getElementById('gps-dot-top').className = active ? "w-2 h-2 rounded-full bg-emerald-500 animate-pulse" : "w-2 h-2 rounded-full bg-gray-500";
+            document.getElementById('gps-text-top').innerText = active ? "監測中" : "GPS";
+        }
+
+        window.updateUI = () => {
+            if (currentRouteIndex === -1 || !allRoutes[currentRouteIndex]) return;
+            const r = allRoutes[currentRouteIndex];
+            const s = r.stations[currentIndex];
+            document.getElementById('current-route-display').innerText = r.name;
+            document.getElementById('current-station-name').innerText = s.name;
+            document.getElementById('current-station-en').innerText = s.enName || "Arriving Soon";
+            const prog = Math.round(((currentIndex + 1) / r.stations.length) * 100);
+            document.getElementById('progress-bar').style.width = prog + '%';
+            document.getElementById('progress-text').innerText = prog;
+
+            document.getElementById('tab-stations').innerHTML = r.stations.map((st, i) => `
+                <div onclick="jumpTo(${i})" class="station-card bg-white p-4 rounded-2xl border flex justify-between items-center ${i === currentIndex ? 'station-active shadow-md' : 'opacity-60'}">
+                    <div>
+                        <p class="font-black text-gray-800">${st.name}</p>
+                        <p class="text-[9px] text-gray-400 font-bold uppercase">${st.enName || '-'}</p>
+                    </div>
+                    ${i === currentIndex ? '<span class="bg-emerald-500 text-white px-3 py-1 rounded-full text-[9px] font-black">目前</span>' : ''}
+                </div>
+            `).join('');
+        };
+
+        window.renderRoutes = () => {
+            document.getElementById('saved-routes-list').innerHTML = allRoutes.map((r, i) => `
+                <div class="bg-white p-4 rounded-2xl border flex justify-between items-center shadow-sm">
+                    <div>
+                        <p class="font-black text-gray-800 text-sm">${r.name}</p>
+                        <p class="text-[9px] text-gray-400 font-bold uppercase">${r.stations.length} 站點</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="loadRoute(${i})" class="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-[10px] font-black">載入</button>
+                        <button onclick="deleteRoute('${r.id}')" class="text-gray-300 px-1">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        // 公用功能
+        window.manualAnnounce = async () => {
+            const s = allRoutes[currentRouteIndex].stations[currentIndex];
+            window.speechSynthesis.cancel();
+            await playSignal();
+            await speak(`${s.name}，到了。`, 'zh-TW');
+            if (s.enName) await speak(`Arrived at ${s.enName}`, 'en-US');
+        };
+
+        window.nextStation = () => { if (currentIndex < allRoutes[currentRouteIndex].stations.length - 1) { currentIndex++; updateUI(); manualAnnounce(); } };
+        window.prevStation = () => { if (currentIndex > 0) { currentIndex--; updateUI(); } };
+        window.jumpTo = (i) => { currentIndex = i; updateUI(); };
+        window.switchTab = (t) => {
+            ['stations', 'routes', 'settings'].forEach(k => {
+                document.getElementById(`tab-${k}`).style.display = (k === t) ? 'block' : 'none';
+                document.getElementById(`nav-${k}`).classList.toggle('text-blue-600', k === t);
+                document.getElementById(`nav-${k}`).classList.toggle('text-gray-400', k !== t);
+            });
+        };
+
+        function getDist(lat1, lon1, lat2, lon2) {
+            const R = 6371e3, p = Math.PI/180;
+            const a = 0.5 - Math.cos((lat2-lat1)*p)/2 + Math.cos(lat1*p)*Math.cos(lat2*p)*(1-Math.cos((lon2-lon1)*p))/2;
+            return R * 2 * Math.asin(Math.sqrt(a));
+        }
+
+        window.translateCurrentInput = async () => {
+            const area = document.getElementById('import-input');
+            const lines = area.value.split('\n').filter(l => l.trim());
+            if(!lines.length) return;
+            const btn = document.getElementById('translate-btn');
+            btn.innerText = "翻譯中...";
+            try {
+                const names = lines.map(l => l.trim().split(/\s+/)[0]);
+                const prompt = `Translate these bus stations: ${names.join(",")}. JSON: {translations: [{original, translated}]}`;
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
+                });
+                const data = JSON.parse((await res.json()).candidates[0].content.parts[0].text);
+                const dict = {}; data.translations.forEach(i => dict[i.original] = i.translated);
+                area.value = lines.map(l => {
+                    const p = l.trim().split(/\s+/);
+                    const n = p[0], lat = p[p.length-2], lng = p[p.length-1];
+                    return `${n} [${dict[n] || 'Unknown'}] ${lat} ${lng}`;
+                }).join('\n');
+            } catch(e) { alert("翻譯失敗"); } finally { btn.innerText = "AI 翻譯英文"; }
+        };
+
+        window.clearAllData = () => { if(confirm("確定重設？")) { localStorage.clear(); location.reload(); } };
+        window.updateSpeechSetting = (k, v) => { speechSettings[k] = parseFloat(v); localStorage.setItem('bus_speech_settings', JSON.stringify(speechSettings)); };
     </script>
 </body>
 </html>
