@@ -10,9 +10,13 @@
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
-        let firebaseConfig = {  
-            apiKey: "AIzaSyAZIM0cr-uhBtGyYd7_ddmmLH41h0PxBro",
-         authDomain: "busts-a64c2.firebaseapp.com",
+        // ==========================================
+        // 1. Firebase 配置位置
+        // 如果是在此 Canvas 環境運行，系統會自動注入 __firebase_config
+        // 如果您是在外部環境運行，請將 Firebase 控制台獲得的 Config 物件填入下方
+        // ==========================================
+        let firebaseConfig = {  apiKey: "AIzaSyAZIM0cr-uhBtGyYd7_ddmmLH41h0PxBro",
+  authDomain: "busts-a64c2.firebaseapp.com",
   projectId: "busts-a64c2",
   storageBucket: "busts-a64c2.firebasestorage.app",
   messagingSenderId: "684162202156",
@@ -20,6 +24,17 @@
         try {
             if (typeof __firebase_config !== 'undefined') {
                 firebaseConfig = JSON.parse(__firebase_config);
+            } else {
+                /* // 外部運行範例：
+                firebaseConfig = {
+                    apiKey: "您的_API_KEY",
+                    authDomain: "您的_PROJECT_ID.firebaseapp.com",
+                    projectId: "您的_PROJECT_ID",
+                    storageBucket: "您的_PROJECT_ID.appspot.com",
+                    messagingSenderId: "您的_SENDER_ID",
+                    appId: "您的_APP_ID"
+                };
+                */
             }
         } catch (e) {
             console.error("Firebase config error", e);
@@ -66,8 +81,6 @@
             pointer-events: auto !important;
             -webkit-tap-highlight-color: transparent;
         }
-
-        .nav-btn span { pointer-events: none; }
 
         #bottom-nav { 
             position: fixed;
@@ -207,14 +220,57 @@
         import { doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
         import { signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
-        // 全域變數與 API Key
-        const apiKey = "AIzaSyCj3QnqcghN1tBrZSxq-H3PWaU4xzYCk1A"; // 請在此處填入您的 Gemini API Key
+        // ==========================================
+        // 2. Google Gemini API Key 填入位置
+        // 請到 Google AI Studio (aistudio.google.com) 取得 API Key
+        // ==========================================
+        const apiKey = "AIzaSyCj3QnqcghN1tBrZSxq-H3PWaU4xzYCk1A"; // <--- 填入您的 Google API Key
+
         let allRoutes = JSON.parse(localStorage.getItem('bus_routes_v8')) || [];
         let currentRouteIndex = parseInt(localStorage.getItem('current_route_idx_v8')) || -1;
         let currentIndex = 0;
         let isTracking = false;
         let watchId = null;
         let speechSettings = JSON.parse(localStorage.getItem('bus_speech_settings')) || { volume: 1.0, rate: 1.0 };
+        
+        // 音效合成器
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        /**
+         * 播放合成音效 (類似現代電子提示音)
+         */
+        function playSignal() {
+            return new Promise(resolve => {
+                const now = audioCtx.currentTime;
+                // 第一聲
+                const osc1 = audioCtx.createOscillator();
+                const gain1 = audioCtx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(880, now); // A5
+                gain1.gain.setValueAtTime(0, now);
+                gain1.gain.linearRampToValueAtTime(0.2 * speechSettings.volume, now + 0.05);
+                gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc1.connect(gain1);
+                gain1.connect(audioCtx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.2);
+
+                // 第二聲
+                const osc2 = audioCtx.createOscillator();
+                const gain2 = audioCtx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(1046.5, now + 0.2); // C6
+                gain2.gain.setValueAtTime(0, now + 0.2);
+                gain2.gain.linearRampToValueAtTime(0.2 * speechSettings.volume, now + 0.25);
+                gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                osc2.connect(gain2);
+                gain2.connect(audioCtx.destination);
+                osc2.start(now + 0.2);
+                osc2.stop(now + 0.4);
+
+                setTimeout(resolve, 500);
+            });
+        }
 
         window.switchTab = (t) => {
             const tabs = ['stations', 'routes', 'settings'];
@@ -292,6 +348,7 @@
                 isTracking = false;
                 updateGPSButtonState(false);
             } else {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
                 isTracking = true;
                 updateGPSButtonState(true);
                 watchId = navigator.geolocation.watchPosition(p => {
@@ -337,6 +394,7 @@
             window.speechSynthesis.cancel();
 
             if (type === "arrival") {
+                await playSignal(); // 播放提示音
                 await speak(`${station.name}，到了。`, 'zh-TW');
                 if (station.enName) {
                     await speak(`Arrived at ${station.enName}`, 'en-US');
@@ -347,7 +405,6 @@
                     await speak(`Next stop, ${station.enName}`, 'en-US');
                 }
             } else if (type === "system") {
-                // 系統提示類音效/播報
                 await speak(station, 'zh-TW');
             }
         }
@@ -392,10 +449,8 @@
             `).join('');
         };
 
-        /**
-         * 載入路線：播放提示音並播報路線名稱
-         */
         window.loadRoute = async (i) => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
             currentRouteIndex = i;
             currentIndex = 0;
             const route = allRoutes[i];
@@ -403,9 +458,8 @@
             window.switchTab('stations');
             updateUI();
 
-            // 語音提示：叮咚（模擬）+ 路線名稱
             window.speechSynthesis.cancel();
-            await speak("叮咚！", "zh-TW"); // 簡單的提示音模擬
+            await playSignal(); // 播放載入提示音
             await triggerAnnouncement(`已載入路線：${route.name}`, "system");
         };
 
