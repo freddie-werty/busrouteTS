@@ -10,7 +10,13 @@
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
-        let firebaseConfig = {};
+        let firebaseConfig = {  
+            apiKey: "AIzaSyAZIM0cr-uhBtGyYd7_ddmmLH41h0PxBro",
+         authDomain: "busts-a64c2.firebaseapp.com",
+  projectId: "busts-a64c2",
+  storageBucket: "busts-a64c2.firebasestorage.app",
+  messagingSenderId: "684162202156",
+  appId: "1:684162202156:web:b868e5b8341dd1c683af89"};
         try {
             if (typeof __firebase_config !== 'undefined') {
                 firebaseConfig = JSON.parse(__firebase_config);
@@ -45,7 +51,6 @@
             overflow-x: hidden;
         }
 
-        /* 導覽按鈕點擊優化 */
         .nav-btn {
             flex: 1;
             height: 100%;
@@ -70,7 +75,7 @@
             left: 0;
             right: 0;
             height: var(--nav-height);
-            z-index: 2147483647; /* 設為最高層級 */
+            z-index: 2147483647; 
             background-color: rgba(255, 255, 255, 0.98);
             backdrop-filter: blur(10px);
             border-top: 1px solid #e5e7eb;
@@ -102,7 +107,7 @@
                 <div class="bg-blue-600 p-2 rounded-lg">🚌</div>
                 <div>
                     <h1 class="font-black text-lg lg:text-xl tracking-tight leading-none">智慧 GPS 公車報站系統</h1>
-                    <p id="sync-status" class="text-[10px] text-slate-400 font-bold uppercase mt-1">連線中...</p>
+                    <p id="sync-status" class="text-[10px] text-slate-400 font-bold uppercase mt-1">載入中...</p>
                 </div>
             </div>
             <div class="flex items-center gap-4 lg:gap-6">
@@ -153,10 +158,10 @@
                 <div id="tab-routes" style="display: none;" class="space-y-6">
                     <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
                         <h3 class="font-black text-gray-800 mb-4 uppercase text-xs tracking-widest text-gray-400">建立新路線</h3>
-                        <input id="new-route-name" type="text" placeholder="路線名稱" class="w-full p-4 bg-gray-50 rounded-xl mb-3 font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <input id="new-route-name" type="text" placeholder="路線名稱 (例如：101公車)" class="w-full p-4 bg-gray-50 rounded-xl mb-3 font-bold border-none outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                         <textarea id="import-input" rows="4" class="w-full p-4 bg-gray-50 rounded-xl mb-4 text-xs font-mono border-none outline-none focus:ring-2 focus:ring-blue-500" placeholder="格式：站名 緯度 經度"></textarea>
                         <div class="grid grid-cols-2 gap-3">
-                            <button id="translate-btn" onclick="translateCurrentInput()" class="bg-blue-50 text-blue-600 py-3 rounded-xl font-black text-sm">AI 翻譯</button>
+                            <button id="translate-btn" onclick="translateCurrentInput()" class="bg-blue-50 text-blue-600 py-3 rounded-xl font-black text-sm">AI 翻譯英文</button>
                             <button onclick="saveNewRoute()" class="bg-blue-600 text-white py-3 rounded-xl font-black text-sm shadow-md">儲存路線</button>
                         </div>
                     </div>
@@ -202,17 +207,16 @@
         import { doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
         import { signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
+        // 全域變數與 API Key
+        const apiKey = "AIzaSyCj3QnqcghN1tBrZSxq-H3PWaU4xzYCk1A"; // 請在此處填入您的 Gemini API Key
         let allRoutes = JSON.parse(localStorage.getItem('bus_routes_v8')) || [];
         let currentRouteIndex = parseInt(localStorage.getItem('current_route_idx_v8')) || -1;
         let currentIndex = 0;
         let isTracking = false;
         let watchId = null;
         let speechSettings = JSON.parse(localStorage.getItem('bus_speech_settings')) || { volume: 1.0, rate: 1.0 };
-        const apiKey = ""; 
 
-        // 強制將切換函數綁定到全域，防止 GitHub Pages 環境下的作用域問題
         window.switchTab = (t) => {
-            console.log("切換分頁：" + t);
             const tabs = ['stations', 'routes', 'settings'];
             tabs.forEach(k => {
                 const content = document.getElementById(`tab-${k}`);
@@ -231,7 +235,6 @@
             updateUI();
             initAuth();
             if (currentRouteIndex === -1) window.switchTab('routes');
-            else window.switchTab('stations');
         };
 
         async function initAuth() {
@@ -245,7 +248,7 @@
                             await signInAnonymously(window.auth);
                         }
                     } catch (e) { 
-                        document.getElementById('sync-status').innerText = "離線模式"; 
+                        document.getElementById('sync-status').innerText = "離線工作模式"; 
                     }
                 }
             }, 100);
@@ -255,6 +258,8 @@
             if (u) {
                 document.getElementById('sync-status').innerText = "雲端同步中";
                 startSync(u.uid);
+            } else {
+                document.getElementById('sync-status').innerText = "離線工作模式";
             }
         });
 
@@ -266,9 +271,12 @@
                 if (cloud.length > 0) {
                     allRoutes = cloud;
                     localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
+                    document.getElementById('sync-status').innerText = "雲端資料已就緒";
                     renderRoutes();
                     updateUI();
                 }
+            }, (err) => {
+                document.getElementById('sync-status').innerText = "離線 (同步暫停)";
             });
         }
 
@@ -298,8 +306,8 @@
                     }
                     currentIndex = minI;
                     updateUI(minD);
-                    if (minD <= 60) triggerAnnouncement(r.stations[currentIndex], "arrival");
-                }, (e) => alert("定位失敗"), { enableHighAccuracy: true });
+                    if (minD <= 50) triggerAnnouncement(r.stations[currentIndex], "arrival");
+                }, (e) => alert("GPS 啟動失敗"), { enableHighAccuracy: true });
             }
         };
 
@@ -307,7 +315,7 @@
             const dot = document.getElementById('gps-dot-top');
             const text = document.getElementById('gps-text-top');
             dot.className = active ? "w-2 h-2 rounded-full bg-emerald-500 animate-pulse" : "w-2 h-2 rounded-full bg-gray-500";
-            text.innerText = active ? "追蹤中" : "GPS";
+            text.innerText = active ? "監測中" : "GPS";
         }
 
         function speak(text, lang) {
@@ -327,14 +335,28 @@
             if (lastAnnounced === key) return;
             lastAnnounced = key;
             window.speechSynthesis.cancel();
-            await speak(type === "arrival" ? `${station.name}，到了。` : `下一站，${station.name}`, 'zh-TW');
-            if (station.enName) await speak(station.enName, 'en-US');
+
+            if (type === "arrival") {
+                await speak(`${station.name}，到了。`, 'zh-TW');
+                if (station.enName) {
+                    await speak(`Arrived at ${station.enName}`, 'en-US');
+                }
+            } else if (type === "next") {
+                await speak(`下一站，${station.name}`, 'zh-TW');
+                if (station.enName) {
+                    await speak(`Next stop, ${station.enName}`, 'en-US');
+                }
+            } else if (type === "system") {
+                // 系統提示類音效/播報
+                await speak(station, 'zh-TW');
+            }
         }
 
         window.updateUI = (distToCurr = null) => {
-            if (currentRouteIndex === -1) return;
+            if (currentRouteIndex === -1 || !allRoutes[currentRouteIndex]) return;
             const r = allRoutes[currentRouteIndex];
             const s = r.stations[currentIndex];
+            if (!s) return;
             document.getElementById('current-route-display').innerText = r.name;
             document.getElementById('current-station-name').innerText = s.name;
             document.getElementById('current-station-en').innerText = s.enName || "No English";
@@ -364,24 +386,34 @@
                     </div>
                     <div class="flex gap-2">
                         <button onclick="loadRoute(${i})" class="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-[10px] font-black">載入</button>
-                        <button onclick="deleteRoute(${i})" class="text-gray-300 px-1">🗑️</button>
+                        <button onclick="deleteRoute(${i})" class="text-gray-300 px-1 hover:text-red-500">🗑️</button>
                     </div>
                 </div>
             `).join('');
         };
 
-        window.loadRoute = (i) => {
+        /**
+         * 載入路線：播放提示音並播報路線名稱
+         */
+        window.loadRoute = async (i) => {
             currentRouteIndex = i;
             currentIndex = 0;
+            const route = allRoutes[i];
             localStorage.setItem('current_route_idx_v8', i);
             window.switchTab('stations');
             updateUI();
+
+            // 語音提示：叮咚（模擬）+ 路線名稱
+            window.speechSynthesis.cancel();
+            await speak("叮咚！", "zh-TW"); // 簡單的提示音模擬
+            await triggerAnnouncement(`已載入路線：${route.name}`, "system");
         };
 
         window.jumpTo = (i) => { currentIndex = i; updateUI(); };
         window.nextStation = () => { 
-            if(currentRouteIndex !== -1 && currentIndex < allRoutes[currentRouteIndex].stations.length-1) { 
-                currentIndex++; updateUI(); 
+            if(currentRouteIndex !== -1 && currentIndex < allRoutes[currentRouteIndex].stations.length - 1) { 
+                currentIndex++; 
+                updateUI(); 
                 triggerAnnouncement(allRoutes[currentRouteIndex].stations[currentIndex], "next");
             } 
         };
@@ -393,53 +425,118 @@
             localStorage.setItem('bus_speech_settings', JSON.stringify(speechSettings));
         };
 
+        async function callTranslateAPI(prompt) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { 
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            translations: {
+                                type: "ARRAY",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        original: { type: "STRING" },
+                                        translated: { type: "STRING" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            let delay = 1000;
+            for (let i = 0; i < 5; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const result = await response.json();
+                    return JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text);
+                } catch (error) {
+                    if (i === 4) throw error;
+                    await new Promise(r => setTimeout(r, delay));
+                    delay *= 2;
+                }
+            }
+        }
+
         window.translateCurrentInput = async () => {
             const area = document.getElementById('import-input');
             const lines = area.value.split('\n').filter(l => l.trim());
             if(!lines.length) return;
+            
             const btn = document.getElementById('translate-btn');
-            btn.innerText = "...";
+            const originalText = btn.innerText;
+            btn.innerText = "翻譯中...";
+
             try {
                 const names = lines.map(l => l.trim().split(/\s+/)[0]);
-                const prompt = `Translate to English: ${names.join(",")}. JSON: {"zh": "en"}`;
-                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                    method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
+                const prompt = `Translate these Chinese bus station names to English accurately: ${names.join(",")}. Return a JSON with 'translations' array of {original, translated}.`;
+                
+                const data = await callTranslateAPI(prompt);
+                const dict = {};
+                data.translations.forEach(item => {
+                    dict[item.original] = item.translated;
                 });
-                const dict = JSON.parse((await resp.json()).candidates[0].content.parts[0].text);
+
                 area.value = lines.map(l => {
                     const p = l.trim().split(/\s+/);
-                    return `${p[0]} [${dict[p[0]] || ''}] ${p[p.length-2]} ${p[p.length-1]}`;
+                    const stationName = p[0];
+                    const lat = p[p.length - 2];
+                    const lng = p[p.length - 1];
+                    const eng = dict[stationName] || 'Unknown';
+                    return `${stationName} [${eng}] ${lat} ${lng}`;
                 }).join('\n');
-            } catch(e) { alert("翻譯失敗"); }
-            btn.innerText = "AI 翻譯";
+            } catch(e) { 
+                alert("翻譯失敗，請檢查 API Key 是否正確或網路連線。"); 
+            } finally {
+                btn.innerText = originalText;
+            }
         };
 
         window.saveNewRoute = async () => {
             const name = document.getElementById('new-route-name').value;
             const input = document.getElementById('import-input').value;
-            if(!name || !input) return;
+            if(!name || !input) return alert("資訊不完整");
             try {
                 const stations = input.split('\n').filter(l => l.trim()).map(line => {
                     const p = line.trim().split(/\s+/);
                     const lng = parseFloat(p.pop()), lat = parseFloat(p.pop());
                     const nPart = p.join(' ');
-                    return { name: nPart.replace(/\[.*?\]/, "").trim(), enName: (nPart.match(/\[(.*?)\]/) || [])[1] || "", lat, lng };
+                    return { 
+                        name: nPart.replace(/\[.*?\]/, "").trim(), 
+                        enName: (nPart.match(/\[(.*?)\]/) || [])[1] || "", 
+                        lat, 
+                        lng 
+                    };
                 });
                 const data = { id: `r_${Date.now()}`, name, stations };
                 allRoutes.push(data);
                 localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
-                if(window.auth.currentUser) await setDoc(doc(window.db, 'artifacts', window.appId, 'users', window.auth.currentUser.uid, 'routes', data.id), data);
+                if (window.auth && window.auth.currentUser) {
+                    await setDoc(doc(window.db, 'artifacts', window.appId, 'users', window.auth.currentUser.uid, 'routes', data.id), data);
+                }
                 renderRoutes();
-                alert("已儲存");
-            } catch (e) { alert("格式錯誤"); }
+                alert("儲存成功");
+            } catch (e) { alert("解析失敗"); }
         };
 
         window.deleteRoute = async (i) => {
             if(confirm("刪除？")) {
                 const r = allRoutes[i];
-                if(window.auth.currentUser) await deleteDoc(doc(window.db, 'artifacts', window.appId, 'users', window.auth.currentUser.uid, 'routes', r.id));
                 allRoutes.splice(i, 1);
                 localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
+                if(window.auth && window.auth.currentUser) {
+                    try { await deleteDoc(doc(window.db, 'artifacts', window.appId, 'users', window.auth.currentUser.uid, 'routes', r.id)); } catch(e) {}
+                }
                 renderRoutes();
             }
         };
