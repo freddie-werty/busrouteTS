@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>智慧 GPS 公車報站 - 全中文同步版</title>
+    <title>智慧 GPS 公車報站</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
@@ -91,7 +91,7 @@
         };
 
         // ==========================================
-        // 跨裝置同步邏輯 (修正重點)
+        // 跨裝置同步邏輯
         // ==========================================
         const setupSync = (user) => {
             if (unsubscribeSync) unsubscribeSync();
@@ -101,29 +101,55 @@
                 ['artifacts', appId, 'public', 'data', syncCode] : 
                 ['artifacts', appId, 'users', user.uid, 'routes'];
 
+            const statusEl = document.getElementById('sync-status-msg');
+            const syncDot = document.getElementById('sync-dot');
+            
+            if (statusEl) statusEl.innerText = "🔄 正在同步雲端資料...";
+
             const q = collection(db, ...collectionPath);
             unsubscribeSync = onSnapshot(q, (snapshot) => {
                 const cloudRoutes = [];
                 snapshot.forEach(doc => cloudRoutes.push(doc.data()));
                 
-                if (cloudRoutes.length > 0) {
-                    // 合併雲端與本地資料 (以雲端為主)
-                    allRoutes = cloudRoutes;
-                    localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
-                    renderRoutes();
+                // 收到資料後更新本地
+                allRoutes = cloudRoutes;
+                localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
+                renderRoutes();
+                
+                if (statusEl) {
+                    statusEl.innerText = `✅ 同步成功 (${new Date().toLocaleTimeString()})`;
+                    statusEl.classList.add('text-emerald-500');
+                    setTimeout(() => statusEl.classList.remove('text-emerald-500'), 2000);
                 }
-            }, (err) => console.error("同步失敗:", err));
+                syncDot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]";
+            }, (err) => {
+                console.error("同步失敗:", err);
+                if (statusEl) statusEl.innerText = "❌ 同步失敗，請檢查網路";
+                syncDot.className = "w-2 h-2 rounded-full bg-red-500";
+            });
         };
 
         window.updateSyncCode = () => {
-            const code = document.getElementById('sync-code-input').value.trim();
-            if (code) {
-                syncCode = code;
-                localStorage.setItem('bus_sync_code_v8', syncCode);
-                document.getElementById('sync-status').innerText = `同步碼: ${syncCode}`;
-                setupSync(auth.currentUser);
-                alert("已切換同步群組，正在載入資料...");
-            }
+            const btn = document.getElementById('sync-btn');
+            const input = document.getElementById('sync-code-input');
+            const code = input.value.trim();
+            
+            // 視覺回饋
+            btn.disabled = true;
+            btn.innerText = "切換中...";
+            
+            // 就算 code 是空的也允許，代表切換回個人私有庫
+            syncCode = code;
+            localStorage.setItem('bus_sync_code_v8', syncCode);
+            document.getElementById('sync-status').innerText = syncCode ? `同步碼: ${syncCode}` : "已連線至雲端個人庫";
+            
+            // 重新初始化同步
+            setupSync(auth.currentUser);
+            
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerText = "切換群組";
+            }, 1000);
         };
 
         // ==========================================
@@ -137,8 +163,10 @@
         };
 
         window.saveNewRoute = async () => {
-            const name = document.getElementById('new-route-name').value;
-            const input = document.getElementById('import-input').value;
+            const nameEl = document.getElementById('new-route-name');
+            const inputEl = document.getElementById('import-input');
+            const name = nameEl.value;
+            const input = inputEl.value;
             if(!name || !input) return;
 
             try {
@@ -154,39 +182,46 @@
                 });
 
                 const data = { id: `r_${Date.now()}`, name, stations };
-                allRoutes.push(data);
-                localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
                 
                 if(auth.currentUser) {
                     const path = syncCode ? 
                         ['artifacts', appId, 'public', 'data', syncCode, data.id] : 
                         ['artifacts', appId, 'users', auth.currentUser.uid, 'routes', data.id];
                     await setDoc(doc(db, ...path), data);
+                } else {
+                    // 沒登入才手動更新本地，否則由 onSnapshot 處理
+                    allRoutes.push(data);
+                    localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
+                    renderRoutes();
                 }
                 
-                document.getElementById('new-route-name').value = "";
-                document.getElementById('import-input').value = "";
-                renderRoutes();
-                alert("儲存成功");
+                nameEl.value = "";
+                inputEl.value = "";
+                alert("儲存成功，雲端同步中...");
             } catch(e) { alert("格式錯誤，請檢查輸入內容"); }
         };
 
         window.deleteRoute = async (i) => {
             if(!confirm("確定要刪除此路線嗎？")) return;
             const r = allRoutes[i];
-            allRoutes.splice(i, 1);
-            localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
             if(auth.currentUser) {
                 const path = syncCode ? 
                     ['artifacts', appId, 'public', 'data', syncCode, r.id] : 
                     ['artifacts', appId, 'users', auth.currentUser.uid, 'routes', r.id];
                 try { await deleteDoc(doc(db, ...path)); } catch(e) {}
+            } else {
+                allRoutes.splice(i, 1);
+                localStorage.setItem('bus_routes_v8', JSON.stringify(allRoutes));
+                renderRoutes();
             }
-            renderRoutes();
         };
 
         window.renderRoutes = () => {
             const list = document.getElementById('route-list');
+            if (allRoutes.length === 0) {
+                list.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs italic">目前沒有路線資料</div>`;
+                return;
+            }
             list.innerHTML = allRoutes.map((r, i) => `
                 <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
                     <div class="truncate mr-4">
@@ -266,7 +301,6 @@
         onAuthStateChanged(auth, (user) => {
             if(user) {
                 document.getElementById('sync-status').innerText = syncCode ? `同步碼: ${syncCode}` : "已連線至雲端個人庫";
-                document.getElementById('sync-dot').className = "w-2 h-2 rounded-full bg-emerald-500";
                 setupSync(user);
             }
         });
@@ -278,12 +312,14 @@
             if(syncCode) document.getElementById('sync-code-input').value = syncCode;
         };
 
-        init();
+            window.onload = init;
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; padding-bottom: 100px; }
         .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
+        .tab-btn { transition: all 0.2s; }
+        .tab-btn:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
@@ -292,7 +328,7 @@
             <div id="sync-dot" class="w-2 h-2 rounded-full bg-slate-600"></div>
             <div>
                 <h1 class="font-black text-sm uppercase tracking-tighter">智慧報站 <span class="text-blue-400">系統</span></h1>
-                <p id="sync-status" class="text-[9px] text-slate-500 font-bold uppercase">正在同步...</p>
+                <p id="sync-status" class="text-[9px] text-slate-500 font-bold uppercase">正在初始化...</p>
             </div>
         </div>
         <div class="flex items-center gap-4">
@@ -309,8 +345,8 @@
         <div class="bg-gradient-to-br from-blue-700 to-blue-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-blue-200 mb-6 relative overflow-hidden">
             <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
             <p class="text-[10px] font-black tracking-[0.3em] opacity-60 mb-2 uppercase text-blue-200">目前站點</p>
-            <h2 id="main-zh" class="text-4xl font-black mb-1 leading-tight">未載入路線</h2>
-            <p id="main-en" class="text-blue-200 font-bold italic text-sm tracking-wide">Select a route</p>
+            <h2 id="main-zh" class="text-4xl font-black mb-1 leading-tight tracking-tight">未載入路線</h2>
+            <p id="main-en" class="text-blue-200 font-bold italic text-sm tracking-wide">Select a route to begin</p>
             <div class="mt-8 pt-6 border-t border-white/10 flex justify-between items-end">
                 <div><span id="dist-val" class="text-3xl font-black">--</span><span class="text-[10px] font-bold opacity-50 uppercase ml-1">公尺</span></div>
                 <div class="flex gap-2">
@@ -326,31 +362,38 @@
             <button onclick="nextStation()" class="flex-1 bg-white py-4 rounded-2xl font-bold shadow-sm border border-slate-100 text-blue-600">下一站</button>
         </div>
 
-        <!-- 站點清單 -->
+        <!-- 站點清單標籤頁 -->
         <div id="tab-stations" class="space-y-3">
              <div class="text-center py-12 text-slate-400 font-medium italic">請切換至「路線管理」載入資料</div>
         </div>
 
-        <!-- 路線管理 -->
+        <!-- 路線管理標籤頁 -->
         <div id="tab-routes" class="hidden space-y-4">
             <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                 <h3 class="font-black text-slate-800 mb-4 flex items-center gap-2"><span>📥</span> 建立新路線</h3>
                 <input id="new-route-name" placeholder="路線名稱 (如: 307 往板橋)" class="w-full mb-3 p-4 bg-slate-50 rounded-xl border-none ring-1 ring-slate-100 focus:ring-2 focus:ring-blue-500 outline-none font-bold">
-                <textarea id="import-input" rows="5" placeholder="格式：站名 緯度 經度" class="w-full p-4 bg-slate-50 rounded-xl border-none ring-1 ring-slate-100 outline-none text-xs font-mono mb-4"></textarea>
-                <button onclick="saveNewRoute()" class="w-full bg-slate-900 text-white py-4 rounded-xl font-black text-sm shadow-lg">儲存至雲端</button>
+                <textarea id="import-input" rows="5" placeholder="格式：站名 緯度 經度 (每行一站)" class="w-full p-4 bg-slate-50 rounded-xl border-none ring-1 ring-slate-100 outline-none text-xs font-mono mb-4"></textarea>
+                <button onclick="saveNewRoute()" class="w-full bg-slate-900 text-white py-4 rounded-xl font-black text-sm shadow-lg">儲存並同步至雲端</button>
             </div>
-            <div id="route-list" class="space-y-3"></div>
+            <div id="route-list" class="space-y-3 pb-20"></div>
         </div>
 
-        <!-- 偏好與同步設定 -->
+        <!-- 偏好與同步設定標籤頁 -->
         <div id="tab-settings" class="hidden space-y-4">
             <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
-                <h3 class="font-black text-slate-800">跨裝置同步設定</h3>
-                <div class="flex gap-2">
-                    <input id="sync-code-input" placeholder="輸入自訂同步碼" class="flex-1 p-4 bg-slate-50 rounded-xl border-none ring-1 ring-slate-100 outline-none font-bold">
-                    <button onclick="updateSyncCode()" class="bg-blue-600 text-white px-6 rounded-xl font-black text-xs">切換群組</button>
+                <div class="flex justify-between items-center">
+                    <h3 class="font-black text-slate-800">跨裝置同步設定</h3>
+                    <span id="sync-status-msg" class="text-[10px] font-bold text-slate-400">尚未連線</span>
                 </div>
-                <p class="text-[10px] text-slate-400">＊ 輸入相同的同步碼，即可在不同裝置共享同一個路線資料庫。</p>
+                <div class="flex gap-2">
+                    <input id="sync-code-input" placeholder="輸入自訂同步碼" class="flex-1 p-4 bg-slate-50 rounded-xl border-none ring-1 ring-slate-100 outline-none font-bold text-slate-700">
+                    <button id="sync-btn" onclick="updateSyncCode()" class="bg-blue-600 text-white px-6 rounded-xl font-black text-xs tab-btn">切換群組</button>
+                </div>
+                <div class="p-4 bg-blue-50 rounded-2xl">
+                    <p class="text-[11px] text-blue-800 leading-relaxed font-bold">
+                        💡 技巧：在其他手機輸入同樣的「同步碼」，當前所有路線就會立刻出現在那台手機上。
+                    </p>
+                </div>
             </div>
 
             <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 space-y-6">
@@ -364,20 +407,20 @@
                     <input type="range" min="0" max="1" step="0.1" value="1.0" class="w-full accent-blue-600" oninput="speechSettings.volume = parseFloat(this.value); localStorage.setItem('bus_speech_settings', JSON.stringify(speechSettings))">
                 </div>
                 <hr class="border-slate-50">
-                <button onclick="if(confirm('確定清除？')){localStorage.clear(); location.reload();}" class="w-full py-4 text-red-500 font-bold text-xs bg-red-50 rounded-2xl">清除本機快取</button>
+                <button onclick="if(confirm('確定清除本地所有快取與設定？')){localStorage.clear(); location.reload();}" class="w-full py-4 text-red-500 font-bold text-xs bg-red-50 rounded-2xl tab-btn">清除本機快取</button>
             </div>
         </div>
     </main>
 
     <!-- 底部導覽 -->
     <div class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md glass rounded-[2.5rem] shadow-2xl p-2 flex justify-around items-center z-[100] border border-white/50">
-        <button onclick="switchTab('stations')" id="nav-stations" class="flex-1 py-3 text-blue-600">
+        <button onclick="switchTab('stations')" id="nav-stations" class="flex-1 py-3 text-blue-600 tab-btn">
             <span class="text-xl block">📍</span><span class="text-[9px] font-black uppercase">到站資訊</span>
         </button>
-        <button onclick="switchTab('routes')" id="nav-routes" class="flex-1 py-3 text-slate-400">
+        <button onclick="switchTab('routes')" id="nav-routes" class="flex-1 py-3 text-slate-400 tab-btn">
             <span class="text-xl block">🚌</span><span class="text-[9px] font-black uppercase">路線管理</span>
         </button>
-        <button onclick="switchTab('settings')" id="nav-settings" class="flex-1 py-3 text-slate-400">
+        <button onclick="switchTab('settings')" id="nav-settings" class="flex-1 py-3 text-slate-400 tab-btn">
             <span class="text-xl block">⚙️</span><span class="text-[9px] font-black uppercase">同步與設定</span>
         </button>
     </div>
