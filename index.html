@@ -7,9 +7,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
-        import { getAuth } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
+        // ==========================================
+        // Firebase 初始化
+        // ==========================================
         let firebaseConfig = {  
             apiKey: "AIzaSyAZIM0cr-uhBtGyYd7_ddmmLH41h0PxBro",
             authDomain: "busts-a64c2.firebaseapp.com",
@@ -28,175 +31,90 @@
         const app = initializeApp(firebaseConfig);
         window.db = getFirestore(app);
         window.auth = getAuth(app);
-        window.appId = typeof __app_id !== 'undefined' ? __app_id : 'bus-v8-offline-sync';
-    </script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; margin: 0; padding-bottom: 80px; }
-        .nav-active { color: #2563eb; transform: scale(1.1); }
-        .station-card { transition: all 0.2s ease; border-left: 4px solid transparent; }
-        .station-active { border-left: 8px solid #2563eb; background-color: #eff6ff; transform: scale(1.02); }
-        .status-offline { background-color: #ef4444 !important; }
-    </style>
-</head>
-<body>
-    <!-- 頂部導航 -->
-    <nav class="bg-slate-900 text-white p-4 sticky top-0 z-50 flex justify-between items-center shadow-md">
-        <div class="flex items-center gap-3">
-            <div id="connection-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-            <div>
-                <h1 class="font-black text-sm tracking-tight">智慧報站 <span class="text-blue-400">Offline+</span></h1>
-                <p id="sync-status" class="text-[9px] text-slate-400 font-bold uppercase">正在檢查連線...</p>
-            </div>
-        </div>
-        <div class="flex items-center gap-4">
-            <div class="text-right">
-                <span id="gps-speed" class="text-2xl font-black text-emerald-400">0</span>
-                <span class="text-[8px] font-bold text-slate-400 uppercase">km/h</span>
-            </div>
-            <button onclick="toggleGPSTracking()" id="gps-btn" class="bg-slate-800 p-2 rounded-lg border border-slate-700">
-                🛰️
-            </button>
-        </div>
-    </nav>
+        window.appId = typeof __app_id !== 'undefined' ? __app_id : 'bus-v8-final';
 
-    <main class="p-4 max-w-2xl mx-auto space-y-4">
-        <!-- 當前站點顯示面板 -->
-        <div id="now-playing-panel" class="bg-white rounded-3xl shadow-xl p-6 border border-gray-100 relative overflow-hidden">
-            <div class="flex justify-between items-center mb-4">
-                <span id="route-name-tag" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-black italic">請選取路線</span>
-                <span class="text-[10px] font-black text-slate-300">GPS AUTO MODE</span>
-            </div>
-            <h2 id="current-name" class="text-4xl font-black text-slate-800 mb-1">準備就緒</h2>
-            <p id="current-en" class="text-slate-400 font-bold text-sm uppercase tracking-wider">Ready to roll</p>
-            
-            <div class="flex gap-2 mt-6">
-                <button onclick="prevStation()" class="flex-1 bg-slate-100 py-3 rounded-xl font-bold text-slate-600">上站</button>
-                <button onclick="manualAnnounce()" class="flex-[2] bg-blue-600 text-white py-3 rounded-xl font-black shadow-lg shadow-blue-200">📢 立即報站</button>
-                <button onclick="nextStation()" class="flex-1 bg-slate-100 py-3 rounded-xl font-bold text-slate-600">下站</button>
-            </div>
-        </div>
-
-        <!-- 分頁內容 -->
-        <div id="view-stations" class="space-y-2"></div>
-
-        <div id="view-routes" class="hidden space-y-4">
-            <!-- 雲端同步碼設定 -->
-            <div class="bg-emerald-50 p-5 rounded-2xl border border-emerald-100">
-                <p class="text-[10px] font-black text-emerald-700 uppercase mb-2">跨裝置同步碼 (輸入相同即可同步)</p>
-                <div class="flex gap-2">
-                    <input id="sync-code-input" class="flex-1 p-3 rounded-xl border-none font-mono font-bold text-emerald-700" placeholder="代碼">
-                    <button onclick="applySyncCode()" class="bg-emerald-600 text-white px-5 rounded-xl font-black text-sm">套用</button>
-                </div>
-            </div>
-
-            <!-- 新增路線 -->
-            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-                <input id="new-name" placeholder="路線名稱" class="w-full mb-2 p-3 bg-gray-50 rounded-lg text-sm font-bold border-none">
-                <textarea id="new-data" rows="3" placeholder="格式：站名 緯度 經度 (一行一站)" class="w-full p-3 bg-gray-50 rounded-lg text-[10px] font-mono border-none"></textarea>
-                <button onclick="saveRoute()" class="w-full mt-3 bg-slate-800 text-white py-3 rounded-xl font-black text-sm">儲存並同步至雲端</button>
-            </div>
-
-            <div id="route-list" class="space-y-2"></div>
-        </div>
-
-        <div id="view-settings" class="hidden">
-            <div class="bg-white p-6 rounded-2xl space-y-6">
-                <h3 class="font-black">系統偏好</h3>
-                <div>
-                    <label class="text-xs font-bold text-gray-500">語音速度</label>
-                    <input type="range" min="0.5" max="1.5" step="0.1" value="1" id="rate-slider" class="w-full accent-blue-600">
-                </div>
-                <button onclick="clearCache()" class="w-full py-4 text-red-500 font-bold border border-red-100 rounded-xl">清除本地所有快取</button>
-            </div>
-        </div>
-    </main>
-
-    <!-- 底部導航 -->
-    <div class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t flex justify-around py-3 z-[100]">
-        <button onclick="showView('stations')" id="btn-stations" class="flex flex-col items-center gap-1 nav-active">
-            <span class="text-xl">📍</span><span class="text-[10px] font-bold uppercase">路線</span>
-        </button>
-        <button onclick="showView('routes')" id="btn-routes" class="flex flex-col items-center gap-1 text-slate-400">
-            <span class="text-xl">☁️</span><span class="text-[10px] font-bold uppercase">管理</span>
-        </button>
-        <button onclick="showView('settings')" id="btn-settings" class="flex flex-col items-center gap-1 text-slate-400">
-            <span class="text-xl">⚙️</span><span class="text-[10px] font-bold uppercase">設定</span>
-        </button>
-    </div>
-
-    <script type="module">
-        import { doc, setDoc, getDoc, collection, onSnapshot, query, deleteDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
-        import { signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
-
-        // 狀態變數
-        let syncCode = localStorage.getItem('bus_sync_code') || Math.random().toString(36).substring(2, 7).toUpperCase();
-        let routes = JSON.parse(localStorage.getItem('bus_cache_routes') || '[]');
+        // 核心資料庫 Key (相容舊版)
+        const LOCAL_STORAGE_KEY = 'bus_routes_v8';
+        
+        let allRoutes = [];
         let activeRouteIdx = -1;
         let activeStationIdx = 0;
         let isTracking = false;
         let watchId = null;
-        let unsubscribe = null;
+        let currentUser = null;
+        let syncCode = localStorage.getItem('bus_sync_code_v8.1') || "";
 
-        // 初始化
-        window.onload = () => {
+        // 將變數暴露給全域以便其它函數存取
+        window.allRoutes = allRoutes;
+
+        // 初始化與 Auth
+        const init = async () => {
+            window.allRoutes = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || "[]");
             document.getElementById('sync-code-input').value = syncCode;
-            setupAuth();
-            renderRoutes();
             
-            // 監聽離線狀態
-            window.addEventListener('online', () => updateConnStatus(true));
-            window.addEventListener('offline', () => updateConnStatus(false));
-            updateConnStatus(navigator.onLine);
+            renderRoutes();
+            setupAuth();
+            
+            window.addEventListener('online', () => updateStatus(true));
+            window.addEventListener('offline', () => updateStatus(false));
+            updateStatus(navigator.onLine);
         };
-
-        function updateConnStatus(online) {
-            const dot = document.getElementById('connection-dot');
-            const statusText = document.getElementById('sync-status');
-            if (online) {
-                dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
-                statusText.innerText = `雲端同步中 (${syncCode})`;
-            } else {
-                dot.className = "w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse";
-                statusText.innerText = "離線工作模式 (使用快取)";
-            }
-        }
 
         async function setupAuth() {
             try {
-                await signInAnonymously(window.auth);
-                onAuthStateChanged(window.auth, (u) => { if(u) startRealtimeSync(); });
-            } catch(e) { updateConnStatus(false); }
+                // 優先使用環境提供的 Token
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(window.auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(window.auth);
+                }
+                
+                onAuthStateChanged(window.auth, (u) => {
+                    if (u) {
+                        currentUser = u;
+                        startSync();
+                    }
+                });
+            } catch (e) { 
+                console.error("Auth Error:", e);
+                updateStatus(false); 
+            }
         }
 
-        // 雲端同步核心
-        function startRealtimeSync() {
-            if (unsubscribe) unsubscribe();
-            const q = query(collection(window.db, 'artifacts', window.appId, 'public', 'data', syncCode));
-            unsubscribe = onSnapshot(q, (snap) => {
+        function startSync() {
+            if (!currentUser) return;
+            const colPath = syncCode ? 
+                ['artifacts', window.appId, 'public', 'data', syncCode] : 
+                ['artifacts', window.appId, 'users', currentUser.uid, 'routes'];
+
+            const q = query(collection(window.db, ...colPath));
+            onSnapshot(q, (snap) => {
                 const cloudData = [];
-                snap.forEach(d => cloudData.push({ id: d.id, ...d.data() }));
+                snap.forEach(d => cloudData.push({ ...d.data(), id: d.id }));
                 
                 if (cloudData.length > 0) {
-                    routes = cloudData;
-                    // 重要：同步到本地快取，以備離線使用
-                    localStorage.setItem('bus_cache_routes', JSON.stringify(routes));
+                    window.allRoutes = cloudData;
+                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(window.allRoutes));
                     renderRoutes();
                 }
-            }, (err) => console.log("雲端連線受限，切換至純離線模式"));
+            }, (err) => console.log("雲端同步受限:", err));
         }
 
+        function updateStatus(online) {
+            const dot = document.getElementById('connection-dot');
+            const txt = document.getElementById('sync-status');
+            if (!dot || !txt) return;
+            dot.className = online ? "w-2.5 h-2.5 rounded-full bg-emerald-500" : "w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse";
+            txt.innerText = online ? (syncCode ? `同步中: ${syncCode}` : "私有雲同步中") : "離線模式 (載入快取資料)";
+        }
+
+        // 導向全域函數
         window.applySyncCode = () => {
-            const code = document.getElementById('sync-code-input').value.trim().toUpperCase();
-            if(!code) return;
-            syncCode = code;
-            localStorage.setItem('bus_sync_code', code);
-            startRealtimeSync();
-            updateConnStatus(true);
-            alert("同步碼已更新");
+            syncCode = document.getElementById('sync-code-input').value.trim().toUpperCase();
+            localStorage.setItem('bus_sync_code_v8.1', syncCode);
+            location.reload();
         };
 
-        // 路線操作
         window.saveRoute = async () => {
             const name = document.getElementById('new-name').value;
             const raw = document.getElementById('new-data').value;
@@ -206,106 +124,115 @@
                 const stations = raw.split('\n').filter(l => l.trim()).map(line => {
                     const p = line.trim().split(/\s+/);
                     const lng = parseFloat(p.pop()), lat = parseFloat(p.pop());
-                    return { name: p.join(' '), lat, lng };
+                    const nPart = p.join(' ');
+                    return { 
+                        name: nPart.replace(/\[.*?\]/, "").trim(), 
+                        enName: (nPart.match(/\[(.*?)\s?\]/) || [])[1] || "",
+                        lat, lng 
+                    };
                 });
                 
                 const id = `r_${Date.now()}`;
                 const newRoute = { id, name, stations };
 
-                // 1. 先存本地 (立即反饋)
-                routes.push(newRoute);
-                localStorage.setItem('bus_cache_routes', JSON.stringify(routes));
+                window.allRoutes.push(newRoute);
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(window.allRoutes));
                 renderRoutes();
 
-                // 2. 嘗試推送到雲端
-                if (navigator.onLine) {
-                    await setDoc(doc(window.db, 'artifacts', window.appId, 'public', 'data', syncCode, id), newRoute);
+                if (navigator.onLine && currentUser) {
+                    const docPath = syncCode ? 
+                        ['artifacts', window.appId, 'public', 'data', syncCode, id] : 
+                        ['artifacts', window.appId, 'users', currentUser.uid, 'routes', id];
+                    await setDoc(doc(window.db, ...docPath), newRoute);
                 }
-                
+
                 document.getElementById('new-name').value = "";
                 document.getElementById('new-data').value = "";
-                alert("路線已儲存 (已排程同步)");
+                alert("路線已儲存");
             } catch(e) { alert("格式錯誤"); }
         };
+
+        const renderRoutes = () => {
+            const list = document.getElementById('route-list');
+            if (!list) return;
+            list.innerHTML = window.allRoutes.map((r, i) => `
+                <div class="bg-white p-4 rounded-xl border flex justify-between items-center shadow-sm">
+                    <div>
+                        <p class="font-bold text-slate-700">${r.name}</p>
+                        <p class="text-[9px] text-slate-400 font-bold uppercase">${r.stations.length} STATIONS</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="loadRoute(${i})" class="bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-black">載入</button>
+                        <button onclick="deleteRoute('${r.id}', ${i})" class="p-2 text-slate-200">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        };
+        window.renderRoutes = renderRoutes;
 
         window.loadRoute = (idx) => {
             activeRouteIdx = idx;
             activeStationIdx = 0;
             showView('stations');
-            updateUI();
-            speak(`已載入 ${routes[idx].name}`);
+            updateStationUI();
+            speak(`已切換至 ${window.allRoutes[idx].name}`);
         };
 
-        window.deleteRoute = async (id) => {
-            if(!confirm("確定刪除？")) return;
-            routes = routes.filter(r => r.id !== id);
-            localStorage.setItem('bus_cache_routes', JSON.stringify(routes));
+        window.deleteRoute = async (id, localIdx) => {
+            if(!confirm("確定刪除此路線？")) return;
+            window.allRoutes.splice(localIdx, 1);
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(window.allRoutes));
             renderRoutes();
-            if (navigator.onLine) {
-                await deleteDoc(doc(window.db, 'artifacts', window.appId, 'public', 'data', syncCode, id));
+            
+            if (navigator.onLine && currentUser) {
+                const docPath = syncCode ? 
+                    ['artifacts', window.appId, 'public', 'data', syncCode, id] : 
+                    ['artifacts', window.appId, 'users', currentUser.uid, 'routes', id];
+                try { await deleteDoc(doc(window.db, ...docPath)); } catch(e) {}
             }
         };
 
-        // UI 渲染
-        window.renderRoutes = () => {
-            const list = document.getElementById('route-list');
-            list.innerHTML = routes.map((r, i) => `
-                <div class="bg-white p-4 rounded-xl border flex justify-between items-center">
-                    <div>
-                        <p class="font-bold text-slate-700">${r.name}</p>
-                        <p class="text-[10px] text-slate-400 font-bold">${r.stations.length} 站點</p>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="loadRoute(${i})" class="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-black">開啟</button>
-                        <button onclick="deleteRoute('${r.id}')" class="text-slate-200">🗑️</button>
-                    </div>
-                </div>
-            `).join('');
-        };
-
-        window.updateUI = () => {
+        const updateStationUI = () => {
             if(activeRouteIdx === -1) return;
-            const r = routes[activeRouteIdx];
+            const r = window.allRoutes[activeRouteIdx];
             const s = r.stations[activeStationIdx];
             
             document.getElementById('route-name-tag').innerText = r.name;
             document.getElementById('current-name').innerText = s.name;
-            document.getElementById('current-en').innerText = s.enName || "Arriving Soon";
+            document.getElementById('current-en').innerText = s.enName || "Next Station";
 
             document.getElementById('view-stations').innerHTML = r.stations.map((st, i) => `
-                <div onclick="jumpTo(${i})" class="station-card bg-white p-4 rounded-xl border flex justify-between items-center ${i === activeStationIdx ? 'station-active shadow-md' : 'opacity-50'}">
-                    <span class="font-bold text-slate-700">${st.name}</span>
-                    ${i === activeStationIdx ? '📍' : ''}
+                <div onclick="jumpTo(${i})" class="station-card bg-white p-4 rounded-xl border flex justify-between items-center ${i === activeStationIdx ? 'station-active shadow-md' : 'opacity-40'}">
+                    <span class="font-bold text-slate-800">${st.name}</span>
+                    ${i === activeStationIdx ? '<span class="text-blue-600 animate-bounce">📍</span>' : ''}
                 </div>
             `).join('');
         };
+        window.updateStationUI = updateStationUI;
 
-        // GPS 與 報站
         window.toggleGPSTracking = () => {
             isTracking = !isTracking;
             const btn = document.getElementById('gps-btn');
             if(isTracking) {
-                btn.classList.add('bg-blue-600');
+                btn.className = "bg-blue-600 p-2 rounded-lg border border-blue-400 shadow-lg shadow-blue-200";
                 watchId = navigator.geolocation.watchPosition(pos => {
                     const { latitude: lat, longitude: lng, speed } = pos.coords;
                     document.getElementById('gps-speed').innerText = Math.round((speed || 0) * 3.6);
-                    checkGPSLocation(lat, lng);
+                    if(activeRouteIdx !== -1) checkArrival(lat, lng);
                 }, null, { enableHighAccuracy: true });
             } else {
-                btn.classList.remove('bg-blue-600');
+                btn.className = "bg-slate-800 p-2 rounded-lg border border-slate-700";
                 navigator.geolocation.clearWatch(watchId);
             }
         };
 
-        function checkGPSLocation(lat, lng) {
-            if(activeRouteIdx === -1) return;
-            const r = routes[activeRouteIdx];
-            // 只檢查當前站與下一站
+        function checkArrival(lat, lng) {
+            const r = window.allRoutes[activeRouteIdx];
             for (let i = activeStationIdx; i < Math.min(activeStationIdx + 2, r.stations.length); i++) {
-                const dist = getDist(lat, lng, r.stations[i].lat, r.stations[i].lng);
-                if (dist < 50 && i !== activeStationIdx) {
+                const d = getDist(lat, lng, r.stations[i].lat, r.stations[i].lng);
+                if (d < 55 && i !== activeStationIdx) {
                     activeStationIdx = i;
-                    updateUI();
+                    updateStationUI();
                     manualAnnounce();
                 }
             }
@@ -313,27 +240,31 @@
 
         window.manualAnnounce = () => {
             if(activeRouteIdx === -1) return;
-            const s = routes[activeRouteIdx].stations[activeStationIdx];
+            const s = window.allRoutes[activeRouteIdx].stations[activeStationIdx];
             window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance(`${s.name}，到了。`);
+            const u = new SpeechSynthesisUtterance(`${s.name}，快到了。`);
             u.lang = 'zh-TW';
             u.rate = parseFloat(document.getElementById('rate-slider').value);
             window.speechSynthesis.speak(u);
         };
 
-        // 輔助工具
-        window.showView = (v) => {
+        const showView = (v) => {
             ['stations', 'routes', 'settings'].forEach(k => {
-                document.getElementById(`view-${k}`).classList.toggle('hidden', k !== v);
-                document.getElementById(`btn-${k}`).classList.toggle('nav-active', k === v);
-                document.getElementById(`btn-${k}`).classList.toggle('text-slate-400', k !== v);
+                const el = document.getElementById(`view-${k}`);
+                const btn = document.getElementById(`btn-${k}`);
+                if (el) el.classList.toggle('hidden', k !== v);
+                if (btn) {
+                    btn.classList.toggle('nav-active', k === v);
+                    btn.classList.toggle('text-slate-400', k !== v);
+                }
             });
         };
+        window.showView = showView;
 
-        window.nextStation = () => { if(activeStationIdx < routes[activeRouteIdx].stations.length - 1) { activeStationIdx++; updateUI(); manualAnnounce(); } };
-        window.prevStation = () => { if(activeStationIdx > 0) { activeStationIdx--; updateUI(); } };
-        window.jumpTo = (i) => { activeStationIdx = i; updateUI(); };
-        window.clearCache = () => { localStorage.clear(); location.reload(); };
+        window.nextStation = () => { if(activeRouteIdx !== -1 && activeStationIdx < window.allRoutes[activeRouteIdx].stations.length-1) { activeStationIdx++; updateStationUI(); manualAnnounce(); } };
+        window.prevStation = () => { if(activeRouteIdx !== -1 && activeStationIdx > 0) { activeStationIdx--; updateStationUI(); } };
+        window.jumpTo = (i) => { activeStationIdx = i; updateStationUI(); };
+        window.clearCache = () => { if(confirm("這將刪除手機上所有路線！")) { localStorage.clear(); location.reload(); } };
         
         function speak(t) {
             const u = new SpeechSynthesisUtterance(t);
@@ -346,6 +277,94 @@
             const a = 0.5 - Math.cos((lat2-lat1)*p)/2 + Math.cos(lat1*p)*Math.cos(lat2*p)*(1-Math.cos((lon2-lon1)*p))/2;
             return R * 2 * Math.asin(Math.sqrt(a));
         }
+
+        // 啟動程式
+        init();
     </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; margin: 0; padding-bottom: 80px; }
+        .nav-active { color: #2563eb; transform: scale(1.1); }
+        .station-card { transition: all 0.2s ease; border-left: 4px solid transparent; }
+        .station-active { border-left: 8px solid #2563eb; background-color: #eff6ff; transform: scale(1.02); }
+    </style>
+</head>
+<body>
+    <nav class="bg-slate-900 text-white p-4 sticky top-0 z-50 flex justify-between items-center shadow-md">
+        <div class="flex items-center gap-3">
+            <div id="connection-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+            <div>
+                <h1 class="font-black text-sm tracking-tight">智慧報站 <span class="text-blue-400">V8.1</span></h1>
+                <p id="sync-status" class="text-[9px] text-slate-400 font-bold uppercase">正在檢查連線...</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="text-right">
+                <span id="gps-speed" class="text-2xl font-black text-emerald-400">0</span>
+                <span class="text-[8px] font-bold text-slate-400 uppercase">km/h</span>
+            </div>
+            <button onclick="toggleGPSTracking()" id="gps-btn" class="bg-slate-800 p-2 rounded-lg border border-slate-700">🛰️</button>
+        </div>
+    </nav>
+
+    <main class="p-4 max-w-2xl mx-auto space-y-4">
+        <div id="now-playing-panel" class="bg-white rounded-3xl shadow-xl p-6 border border-gray-100 relative overflow-hidden">
+            <div class="flex justify-between items-center mb-4">
+                <span id="route-name-tag" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-black italic">未選取</span>
+                <span class="text-[10px] font-black text-slate-300">GPS AUTO MODE</span>
+            </div>
+            <h2 id="current-name" class="text-4xl font-black text-slate-800 mb-1">準備就緒</h2>
+            <p id="current-en" class="text-slate-400 font-bold text-sm uppercase tracking-wider italic">Ready to go</p>
+            
+            <div class="flex gap-2 mt-6">
+                <button onclick="prevStation()" class="flex-1 bg-slate-100 py-3 rounded-xl font-bold text-slate-600">上站</button>
+                <button onclick="manualAnnounce()" class="flex-[2] bg-blue-600 text-white py-3 rounded-xl font-black shadow-lg shadow-blue-200">📢 立即報站</button>
+                <button onclick="nextStation()" class="flex-1 bg-slate-100 py-3 rounded-xl font-bold text-slate-600">下站</button>
+            </div>
+        </div>
+
+        <div id="view-stations" class="space-y-2"></div>
+
+        <div id="view-routes" class="hidden space-y-4">
+            <div class="bg-blue-50 p-5 rounded-2xl border border-blue-100">
+                <p class="text-[10px] font-black text-blue-700 uppercase mb-2">同步碼 (保持空值則使用私有雲)</p>
+                <div class="flex gap-2">
+                    <input id="sync-code-input" class="flex-1 p-3 rounded-xl border-none font-mono font-bold text-blue-700" placeholder="選填同步碼">
+                    <button onclick="applySyncCode()" class="bg-blue-600 text-white px-5 rounded-xl font-black text-sm">套用</button>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                <input id="new-name" placeholder="路線名稱" class="w-full mb-2 p-3 bg-gray-50 rounded-lg text-sm font-bold border-none">
+                <textarea id="new-data" rows="3" placeholder="格式：站名 緯度 經度" class="w-full p-3 bg-gray-50 rounded-lg text-[10px] font-mono border-none"></textarea>
+                <button onclick="saveRoute()" class="w-full mt-3 bg-slate-800 text-white py-3 rounded-xl font-black text-sm">儲存路線</button>
+            </div>
+
+            <div id="route-list" class="space-y-2"></div>
+        </div>
+
+        <div id="view-settings" class="hidden">
+            <div class="bg-white p-6 rounded-2xl space-y-4">
+                <h3 class="font-black">系統設定</h3>
+                <div class="py-2">
+                    <label class="text-xs font-bold text-gray-400">語音速度</label>
+                    <input type="range" min="0.5" max="1.5" step="0.1" value="1" id="rate-slider" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-2">
+                </div>
+                <button onclick="clearCache()" class="w-full py-4 text-red-500 font-bold border border-red-500/10 rounded-xl bg-red-50 mt-10">重設所有資料 (慎用)</button>
+            </div>
+        </div>
+    </main>
+
+    <div class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t flex justify-around py-3 z-[100]">
+        <button onclick="showView('stations')" id="btn-stations" class="flex flex-col items-center gap-1 nav-active">
+            <span class="text-xl">📍</span><span class="text-[10px] font-bold">目前路線</span>
+        </button>
+        <button onclick="showView('routes')" id="btn-routes" class="flex flex-col items-center gap-1 text-slate-400">
+            <span class="text-xl">☁️</span><span class="text-[10px] font-bold">雲端同步</span>
+        </button>
+        <button onclick="showView('settings')" id="btn-settings" class="flex flex-col items-center gap-1 text-slate-400">
+            <span class="text-xl">⚙️</span><span class="text-[10px] font-bold">設定</span>
+        </button>
+    </div>
 </body>
 </html>
