@@ -13,7 +13,7 @@
         // ==========================================
         // 配置區
         // ==========================================
-        const apiKey = ""; 
+        const apiKey = "AIzaSyCj3QnqcghN1tBrZSxq-H3PWaU4xzYCk1A"; 
         let firebaseConfig = {  
             apiKey: "AIzaSyAZIM0cr-uhBtGyYd7_ddmmLH41h0PxBro",
             authDomain: "busts-a64c2.firebaseapp.com",
@@ -199,7 +199,7 @@
             try {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `將下列公車站清單翻譯成英文，格式為「站名 [英文名] 緯度 經度」，每行一站：\n\n${text}` }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `將下列公車站清單翻譯成英文，格式為「站名 [英文名] 緯度 經度」，每行一站，不要包含標題或額外說明：\n\n${text}` }] }] })
                 });
                 const result = await response.json();
                 area.value = result.candidates[0].content.parts[0].text.trim();
@@ -242,10 +242,13 @@
 
         window.switchTab = (t) => {
             ['dashboard', 'manager', 'settings'].forEach(k => {
-                document.getElementById(`tab-${k}`).classList.toggle('hidden', k !== t);
+                const el = document.getElementById(`tab-${k}`);
+                if (el) el.classList.toggle('hidden', k !== t);
                 const btn = document.getElementById(`nav-${k}`);
-                btn.classList.toggle('text-blue-500', k === t);
-                btn.classList.toggle('text-slate-300', k !== t);
+                if (btn) {
+                    btn.classList.toggle('text-blue-500', k === t);
+                    btn.classList.toggle('text-slate-300', k !== t);
+                }
             });
             if(t === 'manager') renderRouteList();
         };
@@ -260,7 +263,9 @@
         };
 
         const renderRouteList = () => {
-            document.getElementById('route-grid').innerHTML = allRoutes.map((r, i) => `
+            const grid = document.getElementById('route-grid');
+            if (!grid) return;
+            grid.innerHTML = allRoutes.map((r, i) => `
                 <div class="bg-white p-6 rounded-3xl border border-slate-100 flex justify-between items-center shadow-sm hover:shadow-md transition-all">
                     <div onclick="loadRoute(${i})" class="cursor-pointer flex-1">
                         <h4 class="text-lg font-black text-slate-800">${r.name}</h4>
@@ -369,7 +374,7 @@
             <div class="bg-white p-12 rounded-[3rem] shadow-sm border border-slate-50 w-full max-w-sm text-center">
                 <h3 class="text-xl font-bold text-slate-800 mb-6 uppercase tracking-widest">數據同步碼</h3>
                 <input id="sync-input" placeholder="輸入同步碼以共享數據" class="w-full bg-slate-50 p-5 rounded-2xl text-center font-bold text-xl outline-none mb-6">
-                <button onclick="localStorage.setItem('bus_sync_code_v3', document.getElementById('sync-input').value); location.reload();" class="w-full bg-blue-500 py-4 rounded-2xl font-bold text-white">更新並載入</button>
+                <button onclick="localStorage.setItem('bus_sync_code_v3', document.getElementById('sync-input').value); location.reload();" class="w-full bg-blue-500 py-4 rounded-2xl font-bold text-white">更新並載入碼</button>
             </div>
         </div>
 
